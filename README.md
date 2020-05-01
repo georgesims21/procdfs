@@ -1,3 +1,8 @@
-# Fuse Example
+# procsys
 
-This is the companion code to my ["Write a filesystem with FUSE"](http://engineering.facile.it/blog/eng/write-filesystem-fuse/) blog post.
+Once cloned run:
+```bash
+cmake -DCMAKE_BUILD_TYPE=Debug . # from root dir
+make -j # for multithreaded make
+```
+
