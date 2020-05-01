@@ -15,8 +15,6 @@
  *  *
 */
 
-static const char *filepath = "/dev";
-static const char *filename = "dev";
 static const char *pndpath = "/proc/net/dev";
 
 int procsize(const char *pathname) {
@@ -44,6 +42,23 @@ char *datafetch(const char *pathname) {
     return strdup(buf);
 }
 
+size_t populate(char **buf, size_t size, off_t offset, char *path) {
+
+    int len = procsize(path);
+    char *filecontent = datafetch(path);
+    if (offset >= len) {
+        return 0;
+    }
+
+    if (offset + size > len) {
+        memcpy(*buf, filecontent + offset, len - offset);
+        return len - offset;
+    }
+
+    memcpy(*buf, filecontent + offset, size);
+    return size;
+}
+
 static int getattr_callback(const char *path, struct stat *stbuf) {
   memset(stbuf, 0, sizeof(struct stat));
 
@@ -53,7 +68,7 @@ static int getattr_callback(const char *path, struct stat *stbuf) {
     return 0;
   }
 
-  if (strcmp(path, filepath) == 0) {
+  if (strcmp(path, "/dev") == 0) {
       int len = procsize(pndpath);
     stbuf->st_mode = S_IFREG | 0777;
     stbuf->st_nlink = 1;
@@ -73,7 +88,7 @@ static int readdir_callback(const char *path, void *buf, fuse_fill_dir_t filler,
   filler(buf, "..", NULL, 0);
 //  filler(buf, "net/", NULL, 0);
 
-  filler(buf, filename, NULL, 0);
+  filler(buf, "dev", NULL, 0);
 
   return 0;
 }
@@ -85,20 +100,8 @@ static int open_callback(const char *path, struct fuse_file_info *fi) {
 static int read_callback(const char *path, char *buf, size_t size, off_t offset,
     struct fuse_file_info *fi) {
 
-  if (strcmp(path, filepath) == 0) {
-      int len = procsize(pndpath);
-      char *filecontent = datafetch(pndpath);
-    if (offset >= len) {
-      return 0;
-    }
-
-    if (offset + size > len) {
-      memcpy(buf, filecontent + offset, len - offset);
-      return len - offset;
-    }
-
-    memcpy(buf, filecontent + offset, size);
-    return size;
+  if (strcmp(path, "/dev") == 0) {
+      return populate(&buf, size, offset, "/proc/net/dev");
   }
 
   return -ENOENT;
