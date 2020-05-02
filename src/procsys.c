@@ -10,12 +10,13 @@
 #include <sys/stat.h>
 
 /* TODO
- *  * Create a directory for /net
- *  * Put the dev file in /net
- *  *
+ *  * Find ds to store dirs and files
+ *  * Use ds to populate in for loop
+ *  * Use malloc correctly
 */
 
 static const char *pndpath = "/proc/net/dev";
+static char proc[] = "/proc";
 
 int procsize(const char *pathname) {
     // All files in /proc are 0 in size, so must access the files and count chars manually
@@ -34,7 +35,7 @@ char *datafetch(const char *pathname) {
     // Return char data from given file
 
     int filesize = procsize(pathname);
-    char buf[filesize+1];
+    char buf[filesize+1]; // Should malloc this
     int fd = openat(AT_FDCWD, pathname, O_RDONLY);
     read(fd, buf, filesize);
     buf[filesize+1] = '\0'; // for safety
@@ -59,6 +60,8 @@ size_t populate(char **buf, size_t size, off_t offset, char *path) {
     return size;
 }
 
+
+
 static int getattr_callback(const char *path, struct stat *stbuf) {
   memset(stbuf, 0, sizeof(struct stat));
 
@@ -67,8 +70,13 @@ static int getattr_callback(const char *path, struct stat *stbuf) {
     stbuf->st_nlink = 2;
     return 0;
   }
+    if (strcmp(path, "/net") == 0) {
+        stbuf->st_mode = S_IFDIR | 0755;
+        stbuf->st_nlink = 2;
+        return 0;
+    }
 
-  if (strcmp(path, "/dev") == 0) {
+  if (strcmp(path, "/net/dev") == 0) {
       int len = procsize(pndpath);
     stbuf->st_mode = S_IFREG | 0777;
     stbuf->st_nlink = 1;
@@ -84,11 +92,15 @@ static int readdir_callback(const char *path, void *buf, fuse_fill_dir_t filler,
   (void) offset;
   (void) fi;
 
-  filler(buf, ".", NULL, 0);
-  filler(buf, "..", NULL, 0);
-//  filler(buf, "net/", NULL, 0);
+    filler(buf, ".", NULL, 0);
+    filler(buf, "..", NULL, 0);
+    if(strcmp(path, "/") == 0) {
 
-  filler(buf, "dev", NULL, 0);
+      filler(buf, "net", NULL, 0);
+  }
+    if(strcmp(path, "/net") == 0) {
+      filler(buf, "dev", NULL, 0);
+    }
 
   return 0;
 }
@@ -100,8 +112,11 @@ static int open_callback(const char *path, struct fuse_file_info *fi) {
 static int read_callback(const char *path, char *buf, size_t size, off_t offset,
     struct fuse_file_info *fi) {
 
-  if (strcmp(path, "/dev") == 0) {
-      return populate(&buf, size, offset, "/proc/net/dev");
+    char pnd[] = "/net/dev";
+
+  if (strncmp(path, pnd, strlen(pnd)) == 0) {
+      const char *final_path = strncat(proc, path, strlen(path));
+      return populate(&buf, size, offset, final_path);
   }
 
   return -ENOENT;

@@ -38,7 +38,12 @@ char *datafetch(const char *pathname) {
 
 int main(int argc, char *argv[]) {
 
-    char *buffer = datafetch(path);
-    printf(buffer);
+    char proc[] = "/proc";
+    char pnd[] = "/net/dev";
+
+    const char *dest = strncat(proc, pnd, strlen(pnd));
+
+    printf(dest);
+
     return 0;
 }
