@@ -8,20 +8,20 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#define BUFSIZE 1024
 
 /* TODO
  *  * Find ds to store dirs and files
  *  * Use ds to populate in for loop
- *  * Use malloc correctly
 */
 
 static const char *pndpath = "/proc/net/dev";
 static char proc[] = "/proc";
 
+// All files in /proc are 0 in size, so must access the files and count chars manually
 int procsize(const char *pathname) {
-    // All files in /proc are 0 in size, so must access the files and count chars manually
 
-    char buf[1024];
+    char buf[BUFSIZE];
     int count = 0;
     int fd = openat(AT_FDCWD, pathname, O_RDONLY);
     while(read(fd, buf, 1) > 0) {
@@ -31,22 +31,33 @@ int procsize(const char *pathname) {
     return count;
 }
 
-char *datafetch(const char *pathname) {
-    // Return char data from given file
-
+// Return char data from given file
+int datafetch(char *buffer, const char *pathname) {
+/* TODO
+ *  * Error handling
+ *  * Malloc the buf
+ */
     int filesize = procsize(pathname);
+//    if((filesize = procsize(pathname)) < 1)
+//        // Doesn't exist (?)
+//        return -1;
     char buf[filesize+1]; // Should malloc this
     int fd = openat(AT_FDCWD, pathname, O_RDONLY);
     read(fd, buf, filesize);
     buf[filesize+1] = '\0'; // for safety
     close(fd);
-    return strdup(buf);
+    char *tmp = strdup(buf);
+    strncat(buffer, tmp, sizeof(tmp));
+//    snprintf(buffer, sizeof(tmp), "%s", tmp);
+    return 0;
 }
 
-size_t populate(char **buf, size_t size, off_t offset, char *path) {
+// Given a filepath, fill the buf with its contents
+size_t populate(char **buf, size_t size, off_t offset, const char *path) {
 
     int len = procsize(path);
-    char *filecontent = datafetch(path);
+    char filecontent[BUFSIZE];
+    datafetch(filecontent, path);
     if (offset >= len) {
         return 0;
     }
@@ -60,9 +71,14 @@ size_t populate(char **buf, size_t size, off_t offset, char *path) {
     return size;
 }
 
-
-
 static int getattr_callback(const char *path, struct stat *stbuf) {
+/* TODO
+ *  * For the getattr_callback:
+ *    - Make function to check if path is referring to dir or file, and populate stbuf accordingly, '/' and '/net'
+ *      should get the same attributes (b/c they are both dirs), while the files should get another. Could do this
+ *      in the function itself with a switch or similar
+ */
+
   memset(stbuf, 0, sizeof(struct stat));
 
   if (strcmp(path, "/") == 0) {
@@ -112,12 +128,8 @@ static int open_callback(const char *path, struct fuse_file_info *fi) {
 static int read_callback(const char *path, char *buf, size_t size, off_t offset,
     struct fuse_file_info *fi) {
 
-    char pnd[] = "/net/dev";
-
-  if (strncmp(path, pnd, strlen(pnd)) == 0) {
-      const char *final_path = strncat(proc, path, strlen(path));
-      return populate(&buf, size, offset, final_path);
-  }
+    char *final_path = strncat(proc, path, strlen(path));
+    return populate(&buf, size, offset, final_path);
 
   return -ENOENT;
 }
