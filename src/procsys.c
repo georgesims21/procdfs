@@ -13,6 +13,7 @@
 /* TODO
  *  * Find ds to store dirs and files
  *  * Use ds to populate in for loop
+ *  * Make does file exist function to make it more modular
 */
 
 static const char *pndpath = "/proc/net/dev";
@@ -38,26 +39,30 @@ int datafetch(char *buffer, const char *pathname) {
  *  * Malloc the buf
  */
     int filesize = procsize(pathname);
-//    if((filesize = procsize(pathname)) < 1)
-//        // Doesn't exist (?)
-//        return -1;
+    if(filesize  < 1)
+        // Doesn't exist (?)
+        return -1;
     char buf[filesize+1]; // Should malloc this
     int fd = openat(AT_FDCWD, pathname, O_RDONLY);
+    // can we just read it into buffer instead? Safe?
     read(fd, buf, filesize);
     buf[filesize+1] = '\0'; // for safety
     close(fd);
     char *tmp = strdup(buf);
-    strncat(buffer, tmp, sizeof(tmp));
-//    snprintf(buffer, sizeof(tmp), "%s", tmp);
+    snprintf(buffer, filesize, "%s", tmp);
     return 0;
 }
 
 // Given a filepath, fill the buf with its contents
 size_t populate(char **buf, size_t size, off_t offset, const char *path) {
-
+/* TODO
+ *  * return -EONENT upon fail
+ */
     int len = procsize(path);
     char filecontent[BUFSIZE];
-    datafetch(filecontent, path);
+    if(datafetch(filecontent, path) < 0) {
+        return -ENOENT; // is this smart?
+    }
     if (offset >= len) {
         return 0;
     }
@@ -130,8 +135,6 @@ static int read_callback(const char *path, char *buf, size_t size, off_t offset,
 
     char *final_path = strncat(proc, path, strlen(path));
     return populate(&buf, size, offset, final_path);
-
-  return -ENOENT;
 }
 
 static struct fuse_operations fuse_example_operations = {
