@@ -20,12 +20,22 @@
 static const char *pndpath = "/proc/net/dev";
 static const char *proc = "/proc";
 
+int file_exists(const char *pathname) {
+    int fd;
+    if((fd = openat(AT_FDCWD, pathname, O_RDONLY) < 0))
+        // file doesn't exist
+        return -1;
+    return 0;
+}
+
 // All files in /proc are 0 in size, so must access the files and count chars manually
 int procsize(const char *pathname) {
 
     char buf[BUFSIZE];
-    int count = 0;
-    int fd = openat(AT_FDCWD, pathname, O_RDONLY);
+    int fd, count = 0;
+    if((fd = openat(AT_FDCWD, pathname, O_RDONLY) < 0))
+        // file doesn't exist
+        return -1;
     while(read(fd, buf, 1) > 0) {
         count++;
     }
@@ -39,9 +49,8 @@ int datafetch(char *buffer, const char *pathname) {
  *  * Error handling
  *  * Malloc the buf
  */
-    int filesize = procsize(pathname);
-    if(filesize  < 1)
-        // Doesn't exist (?)
+    int filesize;
+    if((filesize = procsize(pathname)) < 0)
         return -1;
     char buf[filesize+1]; // Should malloc this
     int fd = openat(AT_FDCWD, pathname, O_RDONLY);
@@ -57,12 +66,11 @@ int datafetch(char *buffer, const char *pathname) {
 // Given a filepath, fill the buf with its contents
 size_t populate(char **buf, size_t size, off_t offset, const char *path) {
 /* TODO
- *  * return -EONENT upon fail
  */
     int len = procsize(path);
     char filecontent[BUFSIZE];
     if(datafetch(filecontent, path) < 0) {
-        return -ENOENT; // is this smart?
+        return -1; // is this smart?
     }
     if (offset >= len) {
         return 0;
@@ -127,7 +135,9 @@ static int open_callback(const char *path, struct fuse_file_info *fi) {
 
 static int read_callback(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
     char *final_path = strncat(proc, path, strlen(path));
-    return populate(&buf, size, offset, final_path);
+    if(file_exists(final_path))
+        return populate(&buf, size, offset, final_path);
+    return -ENOENT;
 }
 
 static struct fuse_operations fuse_example_operations = {
