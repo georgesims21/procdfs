@@ -52,14 +52,16 @@ int datafetch(char *buffer, const char *pathname) {
     int filesize;
     if((filesize = procsize(pathname)) < 0)
         return -1;
-    char buf[filesize+1]; // Should malloc this
+//    char buf[filesize+1]; // Should malloc this
+    char* buf = (char *)malloc((filesize * sizeof(char)) + 1);
     int fd = openat(AT_FDCWD, pathname, O_RDONLY);
     // can we just read it into buffer instead? Safe?
     read(fd, buf, filesize);
     buf[filesize+1] = '\0'; // for safety
     close(fd);
-    char *tmp = strdup(buf);
-    snprintf(buffer, filesize, "%s", tmp);
+//    char *tmp = strdup(buf);
+    snprintf(buffer, filesize, "%s", strdup(buf));
+    free(buf);
     return 0;
 }
 
