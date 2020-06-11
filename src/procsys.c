@@ -56,12 +56,11 @@ int datafetch(char *buffer, const char *pathname) {
 // Given a filepath, fill the buf with its contents
 size_t populate(char **buf, size_t size, off_t offset, const char *path) {
 /* TODO
- *  * return -EONENT upon fail
  */
     int len = procsize(path);
     char filecontent[BUFSIZE];
     if(datafetch(filecontent, path) < 0) {
-        return -ENOENT; // is this smart?
+        return -1; // is this smart?
     }
     if (offset >= len) {
         return 0;
@@ -134,7 +133,10 @@ static int read_callback(const char *path, char *buf, size_t size, off_t offset,
     struct fuse_file_info *fi) {
 
     char *final_path = strncat(proc, path, strlen(path));
-    return populate(&buf, size, offset, final_path);
+    size_t final_size;
+    if((final_size = populate(&buf, size, offset, final_path)) < 0)
+        return -ENOENT;
+    return final_size;
 }
 
 static struct fuse_operations fuse_example_operations = {
