@@ -18,7 +18,7 @@
 */
 
 static const char *pndpath = "/proc/net/dev";
-static const char *proc = "/proc";
+static char proc[] = "/proc";
 
 int file_exists(const char *pathname) {
     int fd;
@@ -33,7 +33,7 @@ int procsize(const char *pathname) {
 
     char buf[BUFSIZE];
     int fd, count = 0;
-    if((fd = openat(AT_FDCWD, pathname, O_RDONLY) < 0))
+    if((fd = openat(AT_FDCWD, pathname, O_RDONLY)) < 0)
         // file doesn't exist
         return -1;
     while(read(fd, buf, 1) > 0) {
