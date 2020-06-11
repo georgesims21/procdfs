@@ -48,8 +48,7 @@ int datafetch(char *buffer, const char *pathname) {
     read(fd, buf, filesize);
     buf[filesize+1] = '\0'; // for safety
     close(fd);
-    char *tmp = strdup(buf);
-    snprintf(buffer, filesize, "%s", tmp);
+    snprintf(buffer, filesize, "%s", strdup(buf));
     return 0;
 }
 
@@ -60,7 +59,7 @@ size_t populate(char **buf, size_t size, off_t offset, const char *path) {
     int len = procsize(path);
     char filecontent[BUFSIZE];
     if(datafetch(filecontent, path) < 0) {
-        return -1; // is this smart?
+        return -1;
     }
     if (offset >= len) {
         return 0;
