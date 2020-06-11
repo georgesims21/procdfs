@@ -50,18 +50,15 @@ int datafetch(char *buffer, const char *pathname) {
  *  * Malloc the buf
  */
     int filesize;
-    if((filesize = procsize(pathname)) < 0)
+    if((filesize = procsize(pathname)) < 1)
         return -1;
-//    char buf[filesize+1]; // Should malloc this
-    char* buf = (char *)malloc((filesize * sizeof(char)) + 1);
+    char *mal = (char *) malloc(filesize + 1);
     int fd = openat(AT_FDCWD, pathname, O_RDONLY);
-    // can we just read it into buffer instead? Safe?
-    read(fd, buf, filesize);
-    buf[filesize+1] = '\0'; // for safety
+    read(fd, mal, filesize);
     close(fd);
-//    char *tmp = strdup(buf);
-    snprintf(buffer, filesize, "%s", strdup(buf));
-    free(buf);
+    mal[filesize+1] = '\0';
+    snprintf(buffer, filesize, "%s", strdup(mal));
+    free(mal);
     return 0;
 }
 
@@ -72,7 +69,7 @@ size_t populate(char **buf, size_t size, off_t offset, const char *path) {
     int len = procsize(path);
     char filecontent[BUFSIZE];
     if(datafetch(filecontent, path) < 0) {
-        return -1; // is this smart?
+        return -1;
     }
     if (offset >= len) {
         return 0;
@@ -137,9 +134,10 @@ static int open_callback(const char *path, struct fuse_file_info *fi) {
 
 static int read_callback(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
     char *final_path = strncat(proc, path, strlen(path));
-    if(file_exists(final_path))
-        return populate(&buf, size, offset, final_path);
-    return -ENOENT;
+    size_t final_size;
+    if((final_size = populate(&buf, size, offset, final_path)) < 0)
+        return -ENOENT;
+    return final_size;
 }
 
 static struct fuse_operations fuse_example_operations = {
