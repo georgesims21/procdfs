@@ -38,17 +38,18 @@ int datafetch(char *buffer, const char *pathname) {
  *  * Error handling
  *  * Malloc the buf
  */
-    int filesize = procsize(pathname);
-    if(filesize  < 1)
-        // Doesn't exist (?)
+    int filesize;
+    if((filesize = procsize(pathname)) < 1)
         return -1;
     char buf[filesize+1]; // Should malloc this
+    char *mal = (char *) malloc(filesize);
     int fd = openat(AT_FDCWD, pathname, O_RDONLY);
     // can we just read it into buffer instead? Safe?
     read(fd, buf, filesize);
     buf[filesize+1] = '\0'; // for safety
     close(fd);
     snprintf(buffer, filesize, "%s", strdup(buf));
+    free(mal);
     return 0;
 }
 
