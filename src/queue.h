@@ -1,0 +1,4 @@
+#ifndef PROCSYS_QUEUE_H
+#define PROCSYS_QUEUE_H
+
+#endif //PROCSYS_QUEUE_H

@@ -12,9 +12,8 @@
 #define BUFSIZE 1024
 
 /* TODO
- *  * Find ds to store dirs and files
+ *  * Must use BST to mirror procfs
  *  * Use ds to populate in for loop
- *  * Make does file exist function to make it more modular
 */
 
 static const char *pndpath = "/proc/net/dev";
