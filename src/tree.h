@@ -1,6 +1,8 @@
 #ifndef PROCSYS_TREE_H
 #define PROCSYS_TREE_H
 
+#include "queue.h"
+
 #define MAXPATH 64
 
 extern struct node *root;
