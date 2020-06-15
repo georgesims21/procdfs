@@ -6,18 +6,24 @@
 int enqueue(QUEUE **queue, NODE *node) {
 /*
  * TODO
- *   * Error check the malloc
+ *   * Error check the malloc with errno
  */
-    QUEUE *local_q = *queue;
+    QUEUE *qp = *queue;
     QUEUE *new_elem = (QUEUE *)malloc(sizeof(QUEUE));
+    if(new_elem == NULL) {
+        // unsuccessful malloc
+        return -1;
+    }
     new_elem->node = node;
-    if(local_q == NULL)
-        *local_q = *new_elem;
+    if(*queue == NULL)
+        // Empty queue
+        *queue = new_elem;
     else {
-        while(local_q->next) {
-            local_q = local_q->next;
+        while(qp->next) {
+            // Use qp as queue pointer to traverse elems
+            qp = qp->next;
         }
-        local_q->next = new_elem;
+        qp->next = new_elem;
     }
     new_elem->next = NULL;
     return 0;
@@ -27,12 +33,13 @@ void printq(QUEUE **queue) {
     QUEUE *local_q = *queue;
     int count = 0;
     if(local_q == NULL)
-        printf("Empty queue!");
+        printf("Empty queue!\n");
     else {
-        while(local_q->next)
+        do {
             printf("queue[%d]:\t%s\n", count, local_q->node->name);
             local_q = local_q->next;
             count++;
+        } while(local_q->next);
     }
 }
 
@@ -44,8 +51,9 @@ int main(int argc, char *argv[]) {
     QUEUE *test = {NULL};
 //    memset(test, 0, sizeof(struct queue));
     printq(&test);
-    NODE *nn = {NULL};
+    NODE *nn;
+    strcpy(nn->name, "testing");
     enqueue(&test, nn);
-//    printq(&test);
+    printq(&test);
     return 0;
 }
