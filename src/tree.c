@@ -1,9 +1,9 @@
 #include "tree.h"
 /*                      DIR/file
               / - root
-              \ - sibling
+              /
              A(/A)
-    child - / \
+    child - / \ - sibling
      (/A/C)C   B(/B)
           /     \
   (/A/C/d)d      e(/e)
@@ -14,6 +14,8 @@
     * Search: follow_sibling to check siblings/stay same level
               follow_child to enter into that dir
  */
+
+NODE *tree_root;
 
 NODE *create_node(char df, char name[], NODE *pnt, NODE *cld, NODE *sib) {
 /* TODO
@@ -40,10 +42,10 @@ NODE *create_node(char df, char name[], NODE *pnt, NODE *cld, NODE *sib) {
 }
 
 int main(int argc, char *argv[]) {
-    NODE *root = create_node('D', "/", 0, 0, 0);
-    NODE *dirA = create_node('D', "A", root, 0, 0);
+    tree_root = create_node('D', "/", 0, 0, 0);
+    NODE *dirA = create_node('D', "A", tree_root, 0, 0);
 
     printf("dirA's parent is: %s\n", dirA->parent->name);
-    printf("root's child is: %s\n", root->child->name);
+    printf("root's child is: %s\n", tree_root->child->name);
     return 0;
 }
