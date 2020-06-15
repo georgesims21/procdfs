@@ -52,9 +52,10 @@ int init_tree() {
     return 0;
 }
 
-NODE *visit_sibling() {if(cwd->sibling)cwd = cwd->sibling;}
-NODE *visit_child() {if(cwd->child)cwd = cwd->child;}
-NODE *visit_parent() {if(cwd->parent)cwd = cwd->parent;}
+NODE *visit_sibling() {cwd = (cwd->sibling) ? cwd->sibling : NULL;}
+NODE *visit_child() {cwd = (cwd->child) ? cwd->child : NULL;}
+NODE *visit_parent() {cwd = (cwd->parent) ? cwd->parent : NULL;}
+NODE *visit_root() {cwd = (tree_root) ? tree_root : NULL;}
 
 int main(int argc, char *argv[]) {
     init_tree();
