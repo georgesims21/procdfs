@@ -11,6 +11,7 @@ typedef struct queue {
     struct node *node;
 } QUEUE;
 
+
 /* Enqueue a NODE into the queue
  * @return
  * 0 upon success
@@ -22,7 +23,7 @@ int enqueue(QUEUE **queue, NODE *node);
  * @return
  * NODE located at front of the queue
  */
-NODE dequeue(QUEUE **queue);
+NODE *dequeue(QUEUE **queue);
 
 /* Print queue contents */
 void printq(QUEUE **queue);

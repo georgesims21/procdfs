@@ -27,7 +27,7 @@ int enqueue(QUEUE **queue, NODE *node) {
     return 0;
 }
 
-NODE dequeue(QUEUE **queue) {
+NODE *dequeue(QUEUE **queue) {
 /*
  * TODO
  *   * Need to error check when queue is empty
@@ -47,7 +47,7 @@ NODE dequeue(QUEUE **queue) {
         }
         printf("Dequeued NODE: %s\n", elem->name);
     }
-    return *elem;
+    return elem;
 }
 
 void printq(QUEUE **queue) {
