@@ -16,6 +16,7 @@
  */
 
 NODE *tree_root;
+NODE *cwd;
 
 NODE *create_node(char df, char name[], NODE *pnt, NODE *cld, NODE *sib) {
 /* TODO
@@ -41,11 +42,26 @@ NODE *create_node(char df, char name[], NODE *pnt, NODE *cld, NODE *sib) {
     return new_node;
 }
 
-int main(int argc, char *argv[]) {
+int init_tree() {
+
     tree_root = create_node('D', "/", 0, 0, 0);
+    if(!tree_root) {
+        return -1;
+    }
+    cwd = tree_root;
+    return 0;
+}
+
+NODE *visit_sibling() {if(cwd->sibling)cwd = cwd->sibling;}
+NODE *visit_child() {if(cwd->child)cwd = cwd->child;}
+NODE *visit_parent() {if(cwd->parent)cwd = cwd->parent;}
+
+int main(int argc, char *argv[]) {
+    init_tree();
     NODE *dirA = create_node('D', "A", tree_root, 0, 0);
 
     printf("dirA's parent is: %s\n", dirA->parent->name);
     printf("root's child is: %s\n", tree_root->child->name);
+    printf("cwd's child is: %s\n", cwd->child->name);
     return 0;
 }
