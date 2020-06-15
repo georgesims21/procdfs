@@ -26,9 +26,10 @@ typedef struct node {
  */
 NODE *create_node(char df, char name[], NODE *pnt, NODE *cld, NODE *sib);
 
-
+void print_cwd();
 NODE *visit_sibling();
 NODE *visit_child();
 NODE *visit_parent();
+NODE *visit_root();
 
 #endif //PROCSYS_TREE_H
