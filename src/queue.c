@@ -8,7 +8,7 @@ int enqueue(QUEUE **queue, NODE *node) {
  * TODO
  *   * Error check the malloc with errno
  */
-    QUEUE *qp = *queue;
+    QUEUE *qp = queue;
     QUEUE *new_elem = (QUEUE *)malloc(sizeof(QUEUE));
     if(!new_elem) {
         // unsuccessful malloc
@@ -27,6 +27,28 @@ int enqueue(QUEUE **queue, NODE *node) {
     }
     new_elem->next = NULL;
     return 0;
+}
+
+NODE dequeue(QUEUE **queue) {
+/*
+ * TODO
+ *   * Need to error check when queue is empty
+ */
+    QUEUE *qp = *queue;
+    if(!qp) {
+        // Empty queue
+        printf("queue already empty!");
+    } else {
+        NODE *elem = qp->node;
+        free(qp->node);
+        if(qp->next) {
+            *queue = qp->next;
+        } else {
+            *queue = NULL;
+        }
+        printf("Dequeued NODE: %s\n", elem->name);
+        return *elem;
+    }
 }
 void printq(QUEUE **queue) {
 
@@ -55,6 +77,7 @@ int dealloq(QUEUE **queue) {
             qp = qp->next;
         }
     }
+    printf("Dealloq'ed..");
 }
 
 int main(int argc, char *argv[]) {
@@ -69,6 +92,9 @@ int main(int argc, char *argv[]) {
     strcpy(n2->name, "Another one");
     enqueue(&test, nn);
     enqueue(&test, n2);
+    printq(&test);
+
+    dequeue(&test);
     printq(&test);
 
     dealloq(&test);
