@@ -10,12 +10,12 @@ int enqueue(QUEUE **queue, NODE *node) {
  */
     QUEUE *qp = *queue;
     QUEUE *new_elem = (QUEUE *)malloc(sizeof(QUEUE));
-    if(new_elem == NULL) {
+    if(!new_elem) {
         // unsuccessful malloc
         return -1;
     }
     new_elem->node = node;
-    if(*queue == NULL)
+    if(!qp)
         // Empty queue
         *queue = new_elem;
     else {
@@ -43,21 +43,35 @@ void printq(QUEUE **queue) {
     }
 }
 
+int dealloq(QUEUE **queue) {
+
+    QUEUE *qp = *queue;
+    if(!qp)
+        return 0;
+    else {
+        while (qp) {
+            // Assumes all nodes are allocated on the heap
+            free(qp->node);
+            qp = qp->next;
+        }
+    }
+}
+
 int main(int argc, char *argv[]) {
 /*
  * TODO
- *   * Getting seg fault when using the enqueue, print not fully tested either
  */
     QUEUE *test = {NULL};
-//    memset(test, 0, sizeof(struct queue));
     printq(&test);
     NODE *nn = (NODE *)malloc(sizeof(NODE));
     NODE *n2 = (NODE *)malloc(sizeof(NODE));
-//    NODE *n2 = {NULL};
     strcpy(nn->name,"testing");
     strcpy(n2->name, "Another one");
     enqueue(&test, nn);
     enqueue(&test, n2);
     printq(&test);
+
+    dealloq(&test);
+
     return 0;
 }
