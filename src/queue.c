@@ -26,6 +26,7 @@ int enqueue(QUEUE **queue, NODE *node) {
         qp->next = new_elem;
     }
     new_elem->next = NULL;
+    printf("Enqueue'd node: \"%s\"\n", new_elem->node->name);
     return 0;
 }
 
@@ -68,8 +69,10 @@ void printq(QUEUE **queue) {
 int dealloq(QUEUE **queue) {
 
     QUEUE *qp = *queue;
-    if(!qp)
-        return 0;
+    if(!qp) {
+        printf("Queue is empty, not dealloq'ing");
+        return -1;
+    }
     else {
         while (qp) {
             // Assumes all nodes are allocated on the heap
@@ -78,6 +81,17 @@ int dealloq(QUEUE **queue) {
         }
     }
     printf("Dealloq'ed..");
+    return 0;
+}
+
+int lenq(QUEUE **queue) {
+    int count = 0;
+    QUEUE *qp = *queue;
+    while(qp) {
+        count++;
+        qp = qp->next;
+    }
+    return count;
 }
 
 int main(int argc, char *argv[]) {
@@ -94,8 +108,19 @@ int main(int argc, char *argv[]) {
     enqueue(&test, n2);
     printq(&test);
 
+    printf("queue length = %d\n", lenq(&test));
+
     dequeue(&test);
     printq(&test);
+
+    NODE *n3 = (NODE *)malloc(sizeof(NODE));
+    NODE *n4 = (NODE *)malloc(sizeof(NODE));
+    strcpy(n3->name,"third");
+    strcpy(n4->name, "fourth");
+    enqueue(&test, n3);
+    enqueue(&test, n4);
+    printq(&test);
+    printf("queue length = %d\n", lenq(&test));
 
     dealloq(&test);
 
