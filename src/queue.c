@@ -30,16 +30,16 @@ int enqueue(QUEUE **queue, NODE *node) {
 }
 void printq(QUEUE **queue) {
 
-    QUEUE *local_q = *queue;
+    QUEUE *qp = *queue;
     int count = 0;
-    if(local_q == NULL)
+    if(!qp)
         printf("Empty queue!\n");
     else {
-        do {
-            printf("queue[%d]:\t%s\n", count, local_q->node->name);
-            local_q = local_q->next;
+        while (qp) {
+            printf("queue[%d]:\t%s\n", count, qp->node->name);
+            qp = qp->next;
             count++;
-        } while(local_q->next);
+        }
     }
 }
 
@@ -51,9 +51,13 @@ int main(int argc, char *argv[]) {
     QUEUE *test = {NULL};
 //    memset(test, 0, sizeof(struct queue));
     printq(&test);
-    NODE *nn;
-    strcpy(nn->name, "testing");
+    NODE *nn = (NODE *)malloc(sizeof(NODE));
+    NODE *n2 = (NODE *)malloc(sizeof(NODE));
+//    NODE *n2 = {NULL};
+    strcpy(nn->name,"testing");
+    strcpy(n2->name, "Another one");
     enqueue(&test, nn);
+    enqueue(&test, n2);
     printq(&test);
     return 0;
 }
