@@ -1,0 +1,6 @@
+mountdir/
+Cmake/
+.gdb_history
+.idea/
+cmake-build-debug/
+
