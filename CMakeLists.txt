@@ -12,7 +12,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 find_package(FUSE REQUIRED)
 
 include_directories(${FUSE_INCLUDE_DIR})
-#add_executable(procsys src/main.c src/fusefs.h)
-add_executable(procsys src/queue.c src/queue.h src/tree.h src/tree.c)
+add_executable(procsys src/main.c src/fusefs.h)
+#add_executable(procsys src/testing.c)
 target_link_libraries(procsys ${FUSE_LIBRARIES})
 

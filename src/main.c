@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 
 #define BUFSIZE 1024
+#define MAXPATH 64
 
 /* TODO
  *  * Must use BST to mirror procfs
@@ -21,7 +22,7 @@ static char proc[] = "/proc";
 
 int file_exists(const char *pathname) {
     int fd;
-    if((fd = openat(AT_FDCWD, pathname, O_RDONLY) < 0))
+    if((fd = openat(AT_FDCWD, pathname, O_RDONLY)) < 0)
         // file doesn't exist
         return -1;
     return 0;
@@ -54,12 +55,46 @@ int datafetch(char *buffer, const char *pathname) {
     char *mal = (char *) malloc(filesize + 1);
     int fd = openat(AT_FDCWD, pathname, O_RDONLY);
     read(fd, mal, filesize);
+    mal[filesize + 1] = '\0';
     close(fd);
-    mal[filesize+1] = '\0';
     snprintf(buffer, filesize, "%s", strdup(mal));
     free(mal);
     return 0;
 }
+
+int is_file(const char *path) {
+
+    struct stat st;
+    if((stat(path, &st)) < 0)
+        return -1;
+
+    return S_ISREG(st.st_mode);
+}
+
+int is_dir(const char *path) {
+
+    struct stat st;
+    if((stat(path, &st)) < 0)
+        return -1;
+
+    return S_ISDIR(st.st_mode);
+}
+
+mode_t what_am_i(const char *path) {
+    struct stat st;
+    if((stat(path, &st)) == -1)
+        perror("stat");
+
+    return st.st_mode & S_IFMT;
+}
+
+struct stat *retstat(const char *path) {
+    struct stat *tmpstbuf;
+        if(stat(path, &tmpstbuf) == -1)
+            printf("stat failed");
+    return tmpstbuf;
+}
+
 
 // Given a filepath, fill the buf with its contents
 size_t populate(char **buf, size_t size, off_t offset, const char *path) {
@@ -81,32 +116,32 @@ size_t populate(char **buf, size_t size, off_t offset, const char *path) {
     return size;
 }
 
+const char *add_proc(const char *path) {
+
+    char *final_path = (char *) malloc(strlen(proc) + strlen(path));
+    strcpy(final_path, proc);
+    strcat(final_path, path);
+    return final_path;
+}
+
+
 static int getattr_callback(const char *path, struct stat *stbuf) {
 /* TODO
- *  * For the getattr_callback:
- *    - Make function to check if path is referring to dir or file, and populate stbuf accordingly, '/' and '/net'
- *      should get the same attributes (b/c they are both dirs), while the files should get another. Could do this
- *      in the function itself with a switch or similar. Keep in mind that the files must contain the sizes.
  */
-
     memset(stbuf, 0, sizeof(struct stat));
 
-    if (strcmp(path, "/") == 0) {
-      stbuf->st_mode = S_IFDIR | 0755;
-      stbuf->st_nlink = 2;
-      return 0;
-    }
-    if (strcmp(path, "/net") == 0) {
-        stbuf->st_mode = S_IFDIR | 0755;
-        stbuf->st_nlink = 2;
-        return 0;
-    }
-    if (strcmp(path, "/net/dev") == 0) {
-      int len = procsize(pndpath);
-      stbuf->st_mode = S_IFREG | 0777;
-      stbuf->st_nlink = 1;
-      stbuf->st_size = len;
-      return 0;
+    const char *final_path = add_proc(path);
+    int len = -1;
+    switch (what_am_i(final_path)) {
+        case S_IFDIR:
+            stbuf->st_mode = S_IFDIR | 0755;
+            stbuf->st_nlink = 2;
+            return 0;
+        case S_IFREG:
+            stbuf->st_mode = S_IFREG | 0777;
+            stbuf->st_nlink = 1;
+            stbuf->st_size = procsize(final_path);
+            return 0;
     }
 
     return -ENOENT;
