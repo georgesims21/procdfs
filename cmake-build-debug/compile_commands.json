@@ -1,0 +1,12 @@
+[
+{
+  "directory": "/home/george/github/procsys/cmake-build-debug",
+  "command": "/usr/bin/cc    -D_FILE_OFFSET_BITS=64 -g -Wall --pedantic -g   -o CMakeFiles/procsys.dir/src/queue.c.o   -c /home/george/github/procsys/src/queue.c",
+  "file": "/home/george/github/procsys/src/queue.c"
+},
+{
+  "directory": "/home/george/github/procsys/cmake-build-debug",
+  "command": "/usr/bin/cc    -D_FILE_OFFSET_BITS=64 -g -Wall --pedantic -g   -o CMakeFiles/procsys.dir/src/tree.c.o   -c /home/george/github/procsys/src/tree.c",
+  "file": "/home/george/github/procsys/src/tree.c"
+}
+]

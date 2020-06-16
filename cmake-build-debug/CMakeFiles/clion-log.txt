@@ -1,0 +1,27 @@
+/opt/clion/bin/cmake/linux/bin/cmake -DCMAKE_BUILD_TYPE=Debug -G "CodeBlocks - Unix Makefiles" /home/george/github/procsys
+-- The C compiler identification is GNU 10.1.0
+-- Check for working C compiler: /usr/bin/cc
+-- Check for working C compiler: /usr/bin/cc -- works
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Detecting C compile features
+-- Detecting C compile features - done
+CMake Error at CMakeLists.txt:12 (find_package):
+  By not providing "FindFUSE.cmake" in CMAKE_MODULE_PATH this project has
+  asked CMake to find a package configuration file provided by "FUSE", but
+  CMake did not find one.
+
+  Could not find a package configuration file provided by "FUSE" with any of
+  the following names:
+
+    FUSEConfig.cmake
+    fuse-config.cmake
+
+  Add the installation prefix of "FUSE" to CMAKE_PREFIX_PATH or set
+  "FUSE_DIR" to a directory containing one of the above files.  If "FUSE"
+  provides a separate development package or SDK, be sure it has been
+  installed.
+
+
+-- Configuring incomplete, errors occurred!
+See also "/home/george/github/procsys/CMakeFiles/CMakeOutput.log".

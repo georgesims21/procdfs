@@ -1,0 +1,1 @@
+/usr/bin/cc  -D_FILE_OFFSET_BITS=64 -g -Wall --pedantic -g  -rdynamic CMakeFiles/procsys.dir/src/queue.c.o CMakeFiles/procsys.dir/src/tree.c.o  -o bin/procsys  -lfuse 
