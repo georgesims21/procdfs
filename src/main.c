@@ -127,23 +127,22 @@ const char *add_proc(const char *path) {
 
 static int getattr_callback(const char *path, struct stat *stbuf) {
 /* TODO
+ *   * Check out the other struct elements and find out how to find them:
+ *                    https://linux.die.net/man/2/stat
  */
     memset(stbuf, 0, sizeof(struct stat));
-
     const char *final_path = add_proc(path);
-    int len = -1;
     switch (what_am_i(final_path)) {
         case S_IFDIR:
             stbuf->st_mode = S_IFDIR | 0755;
-            stbuf->st_nlink = 2;
+            stbuf->st_nlink = 2; // Needed to work
             return 0;
         case S_IFREG:
             stbuf->st_mode = S_IFREG | 0777;
-            stbuf->st_nlink = 1;
+//            stbuf->st_nlink = 1;
             stbuf->st_size = procsize(final_path);
             return 0;
     }
-
     return -ENOENT;
 }
 
@@ -167,7 +166,7 @@ static int open_callback(const char *path, struct fuse_file_info *fi) {
 }
 
 static int read_callback(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
-    char *final_path = strncat(proc, path, strlen(path));
+    const char *final_path = add_proc(path);
     size_t final_size;
     if((final_size = populate(&buf, size, offset, final_path)) < 0)
         return -ENOENT;
