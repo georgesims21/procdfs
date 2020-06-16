@@ -14,10 +14,10 @@ This is the coding project for my CS bachelor thesis, the aim is to recreate pro
 TODO:   
 - [ ] 1: **Writing a filesystem that will mostly reflect what is in the procfs**
 
-    - [ ] 1.1: Create the filesystem datastructures   
+    ~- [ ] 1.1: Create the filesystem datastructures   
         - [x] 1.1.1: Tree (NODEs) to allow for parent, child and sibling node pointers for traversal, plus directory/file name [tree.c](src/tree.c)   
         - [x] 1.1.2: Queue to allow for the BFS search [queue.c](src/queue.c)   
-        - [ ] 1.1.3: BFS algorithm   
+        - [ ] 1.1.3: BFS algorithm~   
 
     - [ ] 1.2: Write simple bash ls/cat commands on the mounted filesystem   
 
