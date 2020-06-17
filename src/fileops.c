@@ -1,10 +1,3 @@
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <sys/stat.h>
-
 #include "fileops.h"
 
 int file_exists(const char *pathname) {
@@ -49,24 +42,6 @@ int datafetch(char *buffer, const char *pathname) {
     return 0;
 }
 
-int is_file(const char *path) {
-
-    struct stat st;
-    if((stat(path, &st)) < 0)
-        return -1;
-
-    return S_ISREG(st.st_mode);
-}
-
-int is_dir(const char *path) {
-
-    struct stat st;
-    if((stat(path, &st)) < 0)
-        return -1;
-
-    return S_ISDIR(st.st_mode);
-}
-
 mode_t what_am_i(const char *path) {
     struct stat st;
     if((stat(path, &st)) == -1)
@@ -109,4 +84,52 @@ const char *add_proc(const char *path) {
     strcpy(final_path, proc);
     strcat(final_path, path);
     return final_path;
+}
+
+int print_dir(const char *path, char *arr[]) {
+    // refs: https://faq.cprogramming.com/cgi-bin/smartfaq.cgi?answer=1046380353&id=1044780608
+    //      https://stackoverflow.com/questions/7631054/how-to-return-an-array-of-strings-in-c
+/*
+ * TODO
+ *   * malloc arr: get amount of files in dir first then use that
+ */
+    DIR           *d;
+    struct dirent *dir;
+    d = opendir(path);
+    int count = 0;
+    if (d)
+    {
+        while ((dir = readdir(d)) != NULL)
+        {
+            size_t len = strlen(dir->d_name);
+            arr[count] = malloc(len + 1);
+            if(!arr[count]) {
+                free(arr[count]);
+                return -1;
+            }
+            strncpy(arr[count], dir->d_name, len);
+            count++;
+        }
+
+        closedir(d);
+    }
+    return 0;
+}
+
+int dir_size(const char *path) {
+
+    DIR           *d;
+    struct dirent *dir;
+    d = opendir(path);
+    int count = 0;
+    if (d)
+    {
+        while ((dir = readdir(d)) != NULL)
+        {
+            count++;
+        }
+
+        closedir(d);
+    }
+    return count;
 }

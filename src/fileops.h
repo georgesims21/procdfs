@@ -1,6 +1,7 @@
 #ifndef PROCSYS_FILEOPS_H
 #define PROCSYS_FILEOPS_H
 
+#define FUSE_USE_VERSION 35
 #include <fuse.h>
 #include <string.h>
 #include <errno.h>
@@ -9,6 +10,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <dirent.h>
 
 #define BUFSIZE 1024
 #define MAXPATH 64
@@ -21,12 +23,12 @@ int file_exists(const char *pathname);
 int procsize(const char *pathname);
 // Return char data from given file
 int datafetch(char *buffer, const char *pathname);
-int is_file(const char *path);
-int is_dir(const char *path);
 mode_t what_am_i(const char *path);
 struct stat *retstat(const char *path);
 // Given a filepath, fill the buf with its contents
 size_t populate(char **buf, size_t size, off_t offset, const char *path);
 const char *add_proc(const char *path);
+int print_dir(const char *path, char *arr[]);
+int dir_size(const char *path);
 
 #endif //PROCSYS_FILEOPS_H
