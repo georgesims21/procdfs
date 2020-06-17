@@ -31,6 +31,13 @@ static int readdir_callback(const char *path, void *buf, fuse_fill_dir_t filler,
     int dir_f_size =  dir_size(final_path);
     char *dir_cnt[dir_f_size];
     dir_contents(final_path, dir_cnt);
+//    if(strcmp(path, "/") == 0) {
+//        filler(buf, ".\n..\n/net", NULL, 0);
+//    } else if (strcmp(path, "/net") == 0) {
+//        filler(buf, dir_cnt[0], NULL, 0);
+//        filler(buf, dir_cnt[1], NULL, 0);
+//        filler(buf, dir_cnt[2], NULL, 0);
+//    }
 
     for (int i = 0; i < dir_f_size; i++) {
         filler(buf, dir_cnt[i], NULL, 0);
