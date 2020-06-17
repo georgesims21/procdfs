@@ -30,20 +30,12 @@ static int readdir_callback(const char *path, void *buf, fuse_fill_dir_t filler,
     const char *final_path = add_proc(path);
     int dir_f_size =  dir_size(final_path);
     char *dir_cnt[dir_f_size];
-    print_dir(final_path, dir_cnt);
+    dir_contents(final_path, dir_cnt);
 
     for (int i = 0; i < dir_f_size; i++) {
-       filler(buf, dir_cnt[i], NULL, 0);
+        filler(buf, dir_cnt[i], NULL, 0);
     }
 
-//    filler(buf, ".", NULL, 0);
-//    filler(buf, "..", NULL, 0);
-//    if(strcmp(path, "/") == 0) {
-//      filler(buf, "net", NULL, 0);
-//    }
-//    if(strcmp(path, "/net") == 0) {
-//      filler(buf, "dev", NULL, 0);
-//    }
     return 0;
 }
 

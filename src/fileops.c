@@ -80,56 +80,50 @@ size_t populate(char **buf, size_t size, off_t offset, const char *path) {
 
 const char *add_proc(const char *path) {
 
-    char *final_path = (char *) malloc(strlen(proc) + strlen(path));
-    strcpy(final_path, proc);
-    strcat(final_path, path);
+    size_t len = strlen(proc) + strlen(path);
+    char *final_path = (char *) malloc(len);
+    snprintf(final_path, len + 1, "%s%s", proc, path);
     return final_path;
 }
 
-int print_dir(const char *path, char *arr[]) {
+
+int dir_contents(const char *path, char *arr[]) {
     // refs: https://faq.cprogramming.com/cgi-bin/smartfaq.cgi?answer=1046380353&id=1044780608
     //      https://stackoverflow.com/questions/7631054/how-to-return-an-array-of-strings-in-c
-/*
- * TODO
- *   * malloc arr: get amount of files in dir first then use that
- */
-    DIR           *d;
+
     struct dirent *dir;
-    d = opendir(path);
-    int count = 0;
-    if (d)
-    {
-        while ((dir = readdir(d)) != NULL)
-        {
+    int i = 0;
+    DIR *d = opendir(path);
+    if(d) {
+        while((dir = readdir(d))) {
             size_t len = strlen(dir->d_name);
-            arr[count] = malloc(len + 1);
-            if(!arr[count]) {
-                free(arr[count]);
+            arr[i] = calloc(len + 1, sizeof(char));
+            if(!arr[i]) {
+                free(arr[i]);
                 return -1;
             }
-            strncpy(arr[count], dir->d_name, len);
-            count++;
+//            strncpy(arr[i], dir->d_name, len);
+            snprintf(arr[i], len + 1, "%s", dir->d_name);
+            i++;
         }
-
         closedir(d);
+    } else {
+        perror("opendir");
+        return -1;
     }
     return 0;
 }
 
 int dir_size(const char *path) {
 
-    DIR           *d;
     struct dirent *dir;
-    d = opendir(path);
-    int count = 0;
-    if (d)
-    {
-        while ((dir = readdir(d)) != NULL)
-        {
-            count++;
+    DIR *d = opendir(path);
+    int i = -1;
+    if (d) {
+        while ((dir = readdir(d))) {
+            i++;
         }
-
         closedir(d);
     }
-    return count;
+    return i;
 }
