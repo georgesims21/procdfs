@@ -19,7 +19,11 @@ TODO:
         - [x] 1.1.2: Queue to allow for the BFS search [queue.c](src/queue.c)   
         - [ ] 1.1.3: BFS algorithm~   
 
-    - [ ] 1.2: Write simple bash ls/cat commands on the mounted filesystem   
+    - [x] 1.1: Mirror procfs with basic directories and files
+
+    - [x] 1.2: Write simple bash ls/cat commands on the mounted filesystem   
+        - [x] 1.2.1: ls procfs == ls mountdir
+        - [x] 1.2.2: cat files in procfs == cat files in mountdir
 
     - [ ] 1.3: Be able to handle standard utility commands like iostat fstat etc
 
@@ -29,6 +33,8 @@ TODO:
             - [ ] ' ifconfig '                - Getting info from above files   
             - [ ] ' ifstat '                  - Periodically reading the files above and subtracting each window to show what has been transmitted per second   
             - [ ] Replicate some other networking utilities - [info about proc files (1.4 is networking)](https://www.kernel.org/doc/Documentation/filesystems/proc.txt)
+
+    - [ ] 1.4: Make sure all (special) file types are handled properly which aren't tested with above utils (symlinks/pipes/etc)
 
 - [ ] 2: **Combine the procfs of two file systems**   
       Assume there is a server and the rest are client filesystems. Assume already

@@ -24,6 +24,10 @@ static int getattr_callback(const char *path, struct stat *stbuf) {
 }
 
 static int readdir_callback(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
+/*
+ * TODO
+ *   * Why does it take 6s to ls root? Check for alternate filler commands
+ */
     (void) offset; // To stop compiler warnings on unused variables
     (void) fi; // fi contains a file handle to be used in create, open and opendir
 
