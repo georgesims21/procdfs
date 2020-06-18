@@ -32,13 +32,10 @@ int datafetch(char *buffer, const char *pathname) {
     int filesize;
     if((filesize = procsize(pathname)) < 1)
         return -1;
-    char *mal = (char *) malloc(filesize + 1);
     int fd = openat(AT_FDCWD, pathname, O_RDONLY);
-    read(fd, mal, filesize);
-    mal[filesize + 1] = '\0';
+    read(fd, buffer, filesize);
+    buffer[filesize + 1] = '\0';
     close(fd);
-    snprintf(buffer, filesize, "%s", strdup(mal));
-    free(mal);
     return 0;
 }
 
@@ -63,7 +60,7 @@ size_t populate(char **buf, size_t size, off_t offset, const char *path) {
 /* TODO
  */
     int len = procsize(path);
-    char filecontent[BUFSIZE];
+    char *filecontent = malloc(len + 1);
     if(datafetch(filecontent, path) < 0) {
         return -1;
     }
@@ -81,37 +78,43 @@ size_t populate(char **buf, size_t size, off_t offset, const char *path) {
 const char *add_proc(const char *path) {
 
     size_t len = strlen(proc) + strlen(path);
-    char *final_path = (char *) malloc(len);
+    char *final_path = malloc(len + 1);
     snprintf(final_path, len + 1, "%s%s", proc, path);
     return final_path;
 }
 
 
-int dir_contents(const char *path, char *arr[]) {
+char **dir_contents(const char *path) {
     // refs: https://faq.cprogramming.com/cgi-bin/smartfaq.cgi?answer=1046380353&id=1044780608
     //      https://stackoverflow.com/questions/7631054/how-to-return-an-array-of-strings-in-c
 
     struct dirent *dir;
-    int i = 0;
+    int i = 0, dirsize = dir_size(path);
     DIR *d = opendir(path);
+    char **arr = malloc(sizeof(char *) * dirsize + 1);
+    if(!arr) {
+        free(arr);
+        return NULL;
+    }
     if(d) {
         while((dir = readdir(d))) {
             size_t len = strlen(dir->d_name);
             arr[i] = calloc(len + 1, sizeof(char));
             if(!arr[i]) {
+                printf("arr[%d] == NULL", i);
                 free(arr[i]);
-                return -1;
+                return NULL;
             }
-//            strncpy(arr[i], dir->d_name, len);
             snprintf(arr[i], len + 1, "%s", dir->d_name);
+            printf("arr[%d] = %s\n", i, arr[i]);
             i++;
         }
         closedir(d);
     } else {
         perror("opendir");
-        return -1;
+        return NULL;
     }
-    return 0;
+    return arr;
 }
 
 int dir_size(const char *path) {

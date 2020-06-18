@@ -28,7 +28,7 @@ struct stat *retstat(const char *path);
 // Given a filepath, fill the buf with its contents
 size_t populate(char **buf, size_t size, off_t offset, const char *path);
 const char *add_proc(const char *path);
-int dir_contents(const char *path, char *arr[]);
+char **dir_contents(const char *path);
 int dir_size(const char *path);
 
 #endif //PROCSYS_FILEOPS_H
