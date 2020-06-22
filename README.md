@@ -28,10 +28,12 @@ TODO:
     - [ ] 1.3: Be able to handle standard utility commands like iostat fstat etc
 
         - [ ] 1.3.1: Write bash (or c) scripts which replicate these commands to run on this new fs.   
-            - [x] ' cat /proc/net/dev '       - Packet stats [packet-bytes](test/packet-bytes.sh)   
+            - [x] ' cat /proc/net/dev '       - Packet stats   
             - [ ] ' cat /proc/net/netstat '   - Tcp stats. First ones are counters   
             - [ ] ' ifconfig '                - Getting info from above files   
-            - [ ] ' ifstat '                  - Periodically reading the files above and subtracting each window to show what has been transmitted per second   
+            - [x] ' ifstat '                  - Periodically reading the files above and subtracting each window to show what has been transmitted per second [packet-bytes](test/packet-bytes.sh) 
+            - [ ] ' iftop '
+            - [ ] ' netstat '
             - [ ] Replicate some other networking utilities - [info about proc files (1.4 is networking)](https://www.kernel.org/doc/Documentation/filesystems/proc.txt)
 
     - [ ] 1.4: Make sure all (special) file types are handled properly which aren't tested with above utils (symlinks/pipes/etc)
