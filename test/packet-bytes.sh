@@ -79,8 +79,8 @@ while true; do
     ft_pTX=$(($pt_pTX-$t_pTX))
 
     echo -e "\r\033[4;0H\033[2K $(print_rows)\n"                            \
-            "\033[2K$lo\t\t $fl_bRX\t\t $fl_bTX\t\t $fl_pRX\t\t $fl_pTX\n"  \
-            "\033[2K$wlp\t $fw_bRX\t\t $fw_bTX\t\t $fw_pRX\t\t $fw_pTX\n"   \
-            "\033[2K$tun\t\t $ft_bRX\t\t $ft_bTX\t\t $ft_pRX\t\t $ft_pTX\t"
+            "\033[2K$lo\t\t  $fl_bRX\t\t  $fl_bTX\t\t  $fl_pRX\t\t  $fl_pTX\n"  \
+            "\033[2K$wlp\t  $fw_bRX\t\t  $fw_bTX\t\t  $fw_pRX\t\t  $fw_pTX\n"   \
+            "\033[2K$tun\t\t  $ft_bRX\t\t  $ft_bTX\t\t  $ft_pRX\t\t  $ft_pTX\t"
 
 done
