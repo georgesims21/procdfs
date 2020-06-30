@@ -1,5 +1,12 @@
-#include "fileops.h"
+#define FUSE_USE_VERSION 30
 
+#include "fileops.h"
+#include <fuse3/fuse.h>
+
+/*
+ * TODO
+ *   Revert back to working prog and try with fuse3 libs. Add passthrough logic modularly
+ */
 static int getattr_callback(const char *path, struct stat *stbuf) {
 /* TODO
  *   * Check out the other struct stat elements and find out how to use them:
@@ -9,18 +16,22 @@ static int getattr_callback(const char *path, struct stat *stbuf) {
  */
     memset(stbuf, 0, sizeof(struct stat));
     const char *final_path = add_proc(path);
-    switch (what_am_i(final_path)) {
-        case S_IFDIR:
-            stbuf->st_mode = S_IFDIR | 0755;
-            stbuf->st_nlink = 2; // Needed to work
-            return 0;
-        case S_IFREG:
-            stbuf->st_mode = S_IFREG | 0777;
-//            stbuf->st_nlink = 1;
-            stbuf->st_size = procsize(final_path);
-            return 0;
+    if(lstat(final_path, stbuf) == -1) {
+        return -ENOENT;
     }
-    return -ENOENT;
+    return 0;
+
+//    switch (what_am_i(final_path)) {
+//        case S_IFDIR:
+//            stbuf->st_mode = S_IFDIR | 0755;
+//            stbuf->st_nlink = 2; // Needed to work
+//            return 0;
+//        case S_IFREG:
+//            stbuf->st_mode = S_IFREG | 0777;
+////            stbuf->st_nlink = 1;
+//            stbuf->st_size = procsize(final_path);
+//            return 0;
+//    }
 }
 
 static int readdir_callback(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
@@ -54,11 +65,25 @@ static int read_callback(const char *path, char *buf, size_t size, off_t offset,
     return final_size;
 }
 
+static int readlink_callback(const char *path, char *buf, size_t size)
+{
+    int res;
+    const char *final_path = add_proc(path);
+
+    res = readlink(final_path, buf, size - 1);
+    if (res == -1)
+        return -errno;
+
+    buf[res] = '\0';
+    return 0;
+}
+
 static struct fuse_operations procsys_ops = {
     .getattr = getattr_callback,
     .open = open_callback,
     .read = read_callback,
     .readdir = readdir_callback,
+    .readlink = readlink_callback,
 };
 
 int main(int argc, char *argv[]) {

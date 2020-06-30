@@ -1,7 +1,7 @@
-#define FUSE_USE_VERSION 31
+#define FUSE_USE_VERSION 35
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fuse3/config.h>
 #endif
 
 #define _GNU_SOURCE
@@ -27,9 +27,17 @@
 #include <sys/xattr.h>
 #endif
 
-#include "passthrough_helpers.h"
+#include "fileops.h"
 
-static void *xmp_init(struct fuse_conn_info *conn,
+struct curr_f_info {
+    int fd;
+    int len;
+    const char *path;
+    char *buf;
+};
+struct curr_f_info cur;
+
+static void *procsys_init(struct fuse_conn_info *conn,
                       struct fuse_config *cfg)
 {
     (void) conn;
@@ -49,35 +57,35 @@ static void *xmp_init(struct fuse_conn_info *conn,
     return NULL;
 }
 
-static int xmp_getattr(const char *path, struct stat *stbuf,
+static int procsys_getattr(const char *path, struct stat *stbuf,
                        struct fuse_file_info *fi)
 {
     (void) fi;
     int res;
 
-    res = lstat(path, stbuf);
+    res = lstat(final_path(path), stbuf);
     if (res == -1)
         return -errno;
 
     return 0;
 }
 
-static int xmp_access(const char *path, int mask)
+static int procsys_access(const char *path, int mask)
 {
     int res;
 
-    res = access(path, mask);
+    res = access(final_path(path), mask);
     if (res == -1)
         return -errno;
 
     return 0;
 }
 
-static int xmp_readlink(const char *path, char *buf, size_t size)
+static int procsys_readlink(const char *path, char *buf, size_t size)
 {
     int res;
 
-    res = readlink(path, buf, size - 1);
+    res = readlink(final_path(path), buf, size - 1);
     if (res == -1)
         return -errno;
 
@@ -86,7 +94,7 @@ static int xmp_readlink(const char *path, char *buf, size_t size)
 }
 
 
-static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
+static int procsys_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                        off_t offset, struct fuse_file_info *fi,
                        enum fuse_readdir_flags flags)
 {
@@ -97,7 +105,7 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     (void) fi;
     (void) flags;
 
-    dp = opendir(path);
+    dp = opendir(final_path(path));
     if (dp == NULL)
         return -errno;
 
@@ -114,33 +122,54 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     return 0;
 }
 
-static int xmp_open(const char *path, struct fuse_file_info *fi)
+static int procsys_open(const char *path, struct fuse_file_info *fi)
 {
     int res;
+    memset(&cur, 0, sizeof(struct curr_f_info));
 
-    res = open(path, fi->flags);
+//    res = open(final_path(path), fi->flags);
+    const char *fpth = final_path(path);
+    res = openat(AT_FDCWD, fpth, O_RDONLY);
     if (res == -1)
         return -errno;
 
     fi->fh = res;
+    cur.fd = res;
+    cur.len = procsizefd(res);
+    cur.path = fpth;
     return 0;
 }
 
-static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
+static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
                     struct fuse_file_info *fi)
 {
     int fd;
     int res;
 
-    if(fi == NULL)
-        fd = open(path, O_RDONLY);
-    else
-        fd = fi->fh;
+    printf("\n\nread fh: %d\n\n", fi->fh);
 
+    if(fi == NULL)
+//        fd = open(final_path(path), O_RDONLY);
+        fd = openat(AT_FDCWD, final_path(path), O_RDONLY);
+    else {
+        printf("\n\nfi->fh contains the file desc.\n\n");
+        fd = fi->fh;
+    }
+//    printf("\n sizeof(buf) == %d\n\n", sizeof(buf));
     if (fd == -1)
         return -errno;
 
-    res = pread(fd, buf, size, offset);
+    if(cur.fd == fd) {
+        printf("\n reading from cur.len\n");
+//        res = pread(fd, buf, cur.len, offset);
+        memcpy(buf, cur.buf, cur.len);
+//        snprintf(cur.buf, "%s", &buf, cur.len);
+    } else {
+        printf("\n reading from len\n");
+        res = pread(fd, buf, size, offset);
+    }
+//    read(res, buf, size);
+
     if (res == -1)
         res = -errno;
 
@@ -149,31 +178,31 @@ static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
     return res;
 }
 
-static int xmp_statfs(const char *path, struct statvfs *stbuf)
+static int procsys_statfs(const char *path, struct statvfs *stbuf)
 {
     int res;
 
-    res = statvfs(path, stbuf);
+    res = statvfs(final_path(path), stbuf);
     if (res == -1)
         return -errno;
 
     return 0;
 }
 
-static int xmp_release(const char *path, struct fuse_file_info *fi)
+static int procsys_release(const char *path, struct fuse_file_info *fi)
 {
     (void) path;
     close(fi->fh);
     return 0;
 }
 
-static off_t xmp_lseek(const char *path, off_t off, int whence, struct fuse_file_info *fi)
+static off_t procsys_lseek(const char *path, off_t off, int whence, struct fuse_file_info *fi)
 {
     int fd;
     off_t res;
 
     if (fi == NULL)
-        fd = open(path, O_RDONLY);
+        fd = open(final_path(path), O_RDONLY);
     else
         fd = fi->fh;
 
@@ -189,21 +218,21 @@ static off_t xmp_lseek(const char *path, off_t off, int whence, struct fuse_file
     return res;
 }
 
-static const struct fuse_operations xmp_oper = {
-        .init       = xmp_init,
-        .getattr	= xmp_getattr,
-        .access		= xmp_access,
-        .readlink	= xmp_readlink,
-        .readdir	= xmp_readdir,
-        .open		= xmp_open,
-        .read		= xmp_read,
-        .statfs		= xmp_statfs,
-        .release	= xmp_release,
-        .lseek		= xmp_lseek,
+static const struct fuse_operations procsys_oper = {
+        .init       = procsys_init,
+        .getattr	= procsys_getattr,
+        .access		= procsys_access,
+        .readlink	= procsys_readlink,
+        .readdir	= procsys_readdir,
+        .open		= procsys_open,
+        .read		= procsys_read,
+        .statfs		= procsys_statfs,
+        .release	= procsys_release,
+        .lseek		= procsys_lseek,
 };
 
 int main(int argc, char *argv[])
 {
     umask(0);
-    return fuse_main(argc, argv, &xmp_oper, NULL);
+    return fuse_main(argc, argv, &procsys_oper, NULL);
 }

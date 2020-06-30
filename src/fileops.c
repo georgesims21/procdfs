@@ -23,16 +23,30 @@ int procsize(const char *pathname) {
     return count;
 }
 
+int procsizefd(int fd) {
+
+    char buf[BUFSIZE];
+    int count = 0;
+    if(fd < 0)
+        // file doesn't exist
+        return -1;
+    while(read(fd, buf, 1) > 0) {
+        count++;
+    }
+    return count;
+}
+
 // Return char data from given file
 int datafetch(char *buffer, const char *pathname) {
 /* TODO
  *  * Error handling
  *  * Malloc the buf
  */
-    int filesize;
+    int filesize, fd;
     if((filesize = procsize(pathname)) < 1)
         return -1;
-    int fd = openat(AT_FDCWD, pathname, O_RDONLY);
+    if((fd = openat(AT_FDCWD, pathname, O_RDONLY)) == -1)
+        return -1;
     read(fd, buffer, filesize);
     buffer[filesize + 1] = '\0';
     close(fd);
@@ -45,6 +59,16 @@ mode_t what_am_i(const char *path) {
         perror("stat");
 
     return st.st_mode & S_IFMT;
+}
+
+// TODO: check the passthrough code to see if/how they use stat
+int testing(const char *path, struct stat *st) {
+    if((stat(path, st)) == -1) {
+       perror("stat");
+       return 1;
+    }
+
+    return 0;
 }
 
 struct stat *retstat(const char *path) {
@@ -75,7 +99,7 @@ size_t populate(char **buf, size_t size, off_t offset, const char *path) {
     return size;
 }
 
-const char *add_proc(const char *path) {
+const char *final_path(const char *path) {
 
     size_t len = strlen(proc) + strlen(path);
     char *final_path = malloc(len + 1);
@@ -101,12 +125,12 @@ char **dir_contents(const char *path) {
             size_t len = strlen(dir->d_name);
             arr[i] = calloc(len + 1, sizeof(char));
             if(!arr[i]) {
-                printf("arr[%d] == NULL", i);
+//                printf("arr[%d] == NULL", i);
                 free(arr[i]);
                 return NULL;
             }
             snprintf(arr[i], len + 1, "%s", dir->d_name);
-            printf("arr[%d] = %s\n", i, arr[i]);
+//            printf("arr[%d] = %s\n", i, arr[i]);
             i++;
         }
         closedir(d);
