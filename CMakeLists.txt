@@ -1,18 +1,27 @@
-cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
-project(procsys VERSION 0.0.1 LANGUAGES C)
+cmake_minimum_required(VERSION 3.16)
+project(procsys C)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_FILE_OFFSET_BITS=64")
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wall --pedantic -g")
-set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake" ${CMAKE_MODULE_PATH})
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
+set(CMAKE_C_STANDARD 11)
+set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/CMakeModules/")
+add_executable(procsys src/passthrough.c src/fileops.c src/fileops.h)
+set(CMAKE_C_FLAGS "-D_FILE_OFFSET_BITS=64 -lfuse3")
 
-find_package(FUSE REQUIRED)
+#https://github.com/thejinx0r/DriveFS/blob/master/CMakeLists.txt
+#lib fuse3
+find_package(PkgConfig REQUIRED)
 
-include_directories(${FUSE_INCLUDE_DIR})
-add_executable(procsys src/main.c src/fusefs.h src/fileops.c src/fileops.h)
-#add_executable(procsys src/testing.c)
-target_link_libraries(procsys ${FUSE_LIBRARIES})
+if(USE_FUSE3)
+    pkg_search_module(LIBFUSE REQUIRED fuse3)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC USE_FUSE3
+            FUSE_USE_VERSION=35)
 
+else()
+    pkg_search_module(LIBFUSE REQUIRED fuse)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC
+            FUSE_USE_VERSION=29)
+endif()
+
+target_link_libraries(${PROJECT_NAME}
+        ${LIBFUSE_LIBRARIES}
+        pthread
+        )

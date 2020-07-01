@@ -53,7 +53,7 @@ int datafetch(char *buffer, const char *pathname) {
     return 0;
 }
 
-mode_t what_am_i(const char *path) {
+mode_t ptype(const char *path) {
     struct stat st;
     if((stat(path, &st)) == -1)
         perror("stat");

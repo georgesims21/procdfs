@@ -60,12 +60,21 @@ static void *procsys_init(struct fuse_conn_info *conn,
 static int procsys_getattr(const char *path, struct stat *stbuf,
                        struct fuse_file_info *fi)
 {
+/*
+ * TODO
+ *  - Need to fill stbuf manually
+ */
     (void) fi;
     int res;
+    const char *fpath = final_path(path);
 
-    res = lstat(final_path(path), stbuf);
+    res = lstat(fpath, stbuf);
     if (res == -1)
         return -errno;
+
+    // proc files are 0 unless opened - can file contents change between now and a read call?
+    if((stbuf->st_mode & S_IFMT) == S_IFREG)
+        stbuf->st_size = procsize(fpath);
 
     return 0;
 }
@@ -127,16 +136,13 @@ static int procsys_open(const char *path, struct fuse_file_info *fi)
     int res;
     memset(&cur, 0, sizeof(struct curr_f_info));
 
-//    res = open(final_path(path), fi->flags);
     const char *fpth = final_path(path);
     res = openat(AT_FDCWD, fpth, O_RDONLY);
     if (res == -1)
         return -errno;
 
     fi->fh = res;
-    cur.fd = res;
-    cur.len = procsizefd(res);
-    cur.path = fpth;
+
     return 0;
 }
 
@@ -146,30 +152,15 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
     int fd;
     int res;
 
-    printf("\n\nread fh: %d\n\n", fi->fh);
-
     if(fi == NULL)
-//        fd = open(final_path(path), O_RDONLY);
         fd = openat(AT_FDCWD, final_path(path), O_RDONLY);
     else {
-        printf("\n\nfi->fh contains the file desc.\n\n");
         fd = fi->fh;
     }
-//    printf("\n sizeof(buf) == %d\n\n", sizeof(buf));
     if (fd == -1)
         return -errno;
 
-    if(cur.fd == fd) {
-        printf("\n reading from cur.len\n");
-//        res = pread(fd, buf, cur.len, offset);
-        memcpy(buf, cur.buf, cur.len);
-//        snprintf(cur.buf, "%s", &buf, cur.len);
-    } else {
-        printf("\n reading from len\n");
-        res = pread(fd, buf, size, offset);
-    }
-//    read(res, buf, size);
-
+    res = pread(fd, buf, size, offset);
     if (res == -1)
         res = -errno;
 
