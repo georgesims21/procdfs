@@ -27,14 +27,16 @@ TODO:
 
     - [ ] 1.3: Be able to handle standard utility commands like iostat fstat etc
 
-        - [ ] 1.3.1: Write bash (or c) scripts which replicate these commands to run on this new fs.   
+        - [x] 1.3.1: Write bash (or c) scripts which replicate these commands to run on this new fs.   
             - [x] ' cat /proc/net/dev '       - Packet stats   
-            - [ ] ' cat /proc/net/netstat '   - Tcp stats. First ones are counters   
-            - [ ] ' ifconfig '                - Getting info from above files   
-            - [x] ' ifstat '                  - Periodically reading the files above and subtracting each window to show what has been transmitted per second [packet-bytes](test/packet-bytes.sh) 
-            - [ ] ' iftop '
+            ~- [ ] ' cat /proc/net/netstat '   - Tcp stats. First ones are counters   
+            - [ ] ' ifconfig '                - Getting info from above files   ~
+            - [x] ' ifstat '                  - Periodically reading the files above and subtracting each window to show what has been transmitted per second [packet-bytes](test/ifstat_procsys.sh) 
+            ~- [ ] ' iftop '
             - [ ] ' netstat '
-            - [ ] Replicate some other networking utilities - [info about proc files (1.4 is networking)](https://www.kernel.org/doc/Documentation/filesystems/proc.txt)
+            - [ ] Replicate some other networking utilities - [info about proc files (1.4 is networking)](https://www.kernel.org/doc/Documentation/filesystems/proc.txt) ~
+            
+            - [ ] 1.3.2: Modify networking binaries to use this FS instead of /proc for testing purposes
 
     - [ ] 1.4: Make sure all (special) file types are handled properly which aren't tested with above utils (symlinks/pipes/etc)
 
@@ -61,6 +63,12 @@ TODO:
       that uberproc is actually /proc.
       Can use strace <command> to see a syscall trace to see what files etc are
       being accessed by that command, this helps with debugging.
+
+      - [  ] 4.1: Use a mix of mount namespaces and chroot
+        - [  ] 4.1.1: Read about [namespaces](https://man7.org/linux/man-pages/man7/namespaces.7.html)
+        - [  ] 4.1.2: Read about [mount namespaces](https://man7.org/linux/man-pages/man7/mount_namespaces.7.html)
+        - [  ] 4.1.3: Read about [chroot](https://man7.org/linux/man-pages/man2/chroot.2.html)
+        - [  ] 4.1.4: Read [tutorial on chroot](https://www.cyberciti.biz/faq/unix-linux-chroot-command-examples-usage-syntax/)
       
 - [ ] 5: **Do the same for sysfs**
 
