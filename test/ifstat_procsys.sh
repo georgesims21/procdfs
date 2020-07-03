@@ -1,8 +1,8 @@
 #!/bin/bash
 # George Sims
 
-#pnetd="$HOME/github/libfuse/example/mountdir/net/dev"
-pnetd="/proc/net/dev"
+pnetd="$HOME/github/procsys/mountdir/net/dev"
+#pnetd="/proc/net/dev"
 wlp="wlp58s0"
 lo="lo"
 tun="tun0"

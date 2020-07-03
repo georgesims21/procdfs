@@ -1,3 +1,6 @@
+/*
+ * Main skeleton taken from the libfuse example: passthrough.c
+ */
 #define FUSE_USE_VERSION 35
 
 #ifdef HAVE_CONFIG_H
@@ -29,17 +32,9 @@
 
 #include "fileops.h"
 
-struct curr_f_info {
-    int fd;
-    int len;
-    const char *path;
-    char *buf;
-};
-struct curr_f_info cur;
-
 static void *procsys_init(struct fuse_conn_info *conn,
-                      struct fuse_config *cfg)
-{
+                      struct fuse_config *cfg) {
+
     (void) conn;
     cfg->use_ino = 1;
 
@@ -58,12 +53,8 @@ static void *procsys_init(struct fuse_conn_info *conn,
 }
 
 static int procsys_getattr(const char *path, struct stat *stbuf,
-                       struct fuse_file_info *fi)
-{
-/*
- * TODO
- *  - Need to fill stbuf manually
- */
+                       struct fuse_file_info *fi) {
+
     (void) fi;
     int res;
     const char *fpath = final_path(path);
@@ -72,15 +63,20 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
     if (res == -1)
         return -errno;
 
-    // proc files are 0 unless opened - can file contents change between now and a read call?
+    /*
+     * proc files are 0 unless opened - can file contents change between now and a read call?
+     * problem is that to cat a file we need the size > 0 here, but it takes a long time to ls -al
+     * as it needs to get all filesizes.. Can we fill the stbuf elsewhere?
+     */
     if((stbuf->st_mode & S_IFMT) == S_IFREG)
         stbuf->st_size = procsize(fpath);
+//        stbuf->st_size = 0;
 
     return 0;
 }
 
-static int procsys_access(const char *path, int mask)
-{
+static int procsys_access(const char *path, int mask) {
+
     int res;
 
     res = access(final_path(path), mask);
@@ -90,8 +86,8 @@ static int procsys_access(const char *path, int mask)
     return 0;
 }
 
-static int procsys_readlink(const char *path, char *buf, size_t size)
-{
+static int procsys_readlink(const char *path, char *buf, size_t size) {
+
     int res;
 
     res = readlink(final_path(path), buf, size - 1);
@@ -105,8 +101,8 @@ static int procsys_readlink(const char *path, char *buf, size_t size)
 
 static int procsys_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                        off_t offset, struct fuse_file_info *fi,
-                       enum fuse_readdir_flags flags)
-{
+                       enum fuse_readdir_flags flags) {
+
     DIR *dp;
     struct dirent *de;
 
@@ -131,24 +127,23 @@ static int procsys_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     return 0;
 }
 
-static int procsys_open(const char *path, struct fuse_file_info *fi)
-{
-    int res;
-    memset(&cur, 0, sizeof(struct curr_f_info));
+static int procsys_open(const char *path, struct fuse_file_info *fi) {
 
+    int res;
     const char *fpth = final_path(path);
     res = openat(AT_FDCWD, fpth, O_RDONLY);
     if (res == -1)
         return -errno;
 
-    fi->fh = res;
+    printf("\n\n path: %s\nfpath: %s\n\n", path, fpth);
 
+    fi->fh = res;
     return 0;
 }
 
 static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
-                    struct fuse_file_info *fi)
-{
+                    struct fuse_file_info *fi) {
+
     int fd;
     int res;
 
@@ -169,8 +164,8 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
     return res;
 }
 
-static int procsys_statfs(const char *path, struct statvfs *stbuf)
-{
+static int procsys_statfs(const char *path, struct statvfs *stbuf) {
+
     int res;
 
     res = statvfs(final_path(path), stbuf);
@@ -180,15 +175,15 @@ static int procsys_statfs(const char *path, struct statvfs *stbuf)
     return 0;
 }
 
-static int procsys_release(const char *path, struct fuse_file_info *fi)
-{
+static int procsys_release(const char *path, struct fuse_file_info *fi) {
+
     (void) path;
     close(fi->fh);
     return 0;
 }
 
-static off_t procsys_lseek(const char *path, off_t off, int whence, struct fuse_file_info *fi)
-{
+static off_t procsys_lseek(const char *path, off_t off, int whence, struct fuse_file_info *fi) {
+
     int fd;
     off_t res;
 
@@ -222,8 +217,8 @@ static const struct fuse_operations procsys_oper = {
         .lseek		= procsys_lseek,
 };
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
+
     umask(0);
     return fuse_main(argc, argv, &procsys_oper, NULL);
 }
