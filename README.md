@@ -24,7 +24,7 @@ TODO:
         - [x] 1.2.1: ls procfs == ls procsys
         - [x] 1.2.2: cat files in procfs == cat files in procsys
 
-    - [ ] 1.3: Be able to handle standard utility commands like iostat fstat etc
+    - [x] 1.3: Be able to handle standard utility commands like iostat fstat etc
 
         - [x] 1.3.1: Write bash (or c) scripts which replicate these commands to run on this new fs.   
             - [x] ' cat /proc/net/dev '       - Packet stats   
@@ -35,9 +35,16 @@ TODO:
             - [ ] ' netstat '
             - [ ] Replicate some other networking utilities - [info about proc files (1.4 is networking)](https://www.kernel.org/doc/Documentation/filesystems/proc.txt) ~
             
-            - [ ] 1.3.2: Modify networking binaries to use this FS instead of /proc for testing purposes
+            - [x] 1.3.2: Modify networking binaries to use this FS instead of /proc for testing purposes
+                - [x] arp
+                - [x] hostname
+                - [x] ifconfig
+                - [x] netstat
+                - [x] rarp
+                - [x] route
 
-    - [ ] 1.4: Make sure all (special) file types are handled properly which aren't tested with above utils (symlinks/pipes/etc)
+    - [ ] 1.4 (extra): Fix bottleneck in the getattrb operation
+        - Due to proc files being 0 size, if you don't manually get the size and save it in the stat struct then no cat commands print. BUT this introduces huge bottleneck when ls'ing all contents
 
 - [ ] 2: **Combine the procfs of two file systems**   
       Assume there is a server and the rest are client filesystems. Assume already
