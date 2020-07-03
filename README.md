@@ -1,5 +1,4 @@
 # procsys
-o
 Once cloned run:
 ```bash
 cmake [-DCMAKE_BUILD_TYPE=Debug] . # from root dir
@@ -22,8 +21,8 @@ TODO:
     - [x] 1.1: Mirror procfs with basic directories and files
 
     - [x] 1.2: Write simple bash ls/cat commands on the mounted filesystem   
-        - [x] 1.2.1: ls procfs == ls mountdir
-        - [x] 1.2.2: cat files in procfs == cat files in mountdir
+        - [x] 1.2.1: ls procfs == ls procsys
+        - [x] 1.2.2: cat files in procfs == cat files in procsys
 
     - [ ] 1.3: Be able to handle standard utility commands like iostat fstat etc
 
