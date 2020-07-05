@@ -4,6 +4,8 @@ project(procsys C)
 set(CMAKE_C_STANDARD 11)
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/CMakeModules/")
 add_executable(procsys src/main.c src/fileops.c src/fileops.h)
+#add_executable(procsys test/net-tools-code/arp.c)
+
 set(CMAKE_C_FLAGS "-D_FILE_OFFSET_BITS=64 -lfuse3")
 
 #https://github.com/thejinx0r/DriveFS/blob/master/CMakeLists.txt
