@@ -7,6 +7,8 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <asm/errno.h>
+#include <libnet.h>
 
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "EndlessLoop"
