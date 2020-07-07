@@ -26,6 +26,7 @@ int main(int argc, char *argv[]) {
 
     if((pid = fork()) < 0) {
         perror("fork");
+        exit(1);
     } else if(pid == 0) {
         // child
         printf("child initiated\n");
@@ -49,7 +50,7 @@ int main(int argc, char *argv[]) {
         // parent
         printf("Processing loop\n");
         while(1) {
-            if((n = read(sock, ans, MAX)) < 0) {
+            if((n = read(sock, ans, MAX)) == 0) {
                 perror("read");
                 exit(1);
             } else if(n == 0) {

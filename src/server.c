@@ -4,7 +4,7 @@
  * TODO
  *  - [x] Basic client-server model
  *  - [x] Hold more than 1 connection (with comms.)
- *  - [ ] Ping messages from server to all clients (notification)
+ *  - [x] Ping messages from server to all clients (notification)
  */
 
 int main(int argc, char *argv[]) {
@@ -61,10 +61,6 @@ int main(int argc, char *argv[]) {
                 maxsd = sd; // Need higheset sd for select
         }
 
-//        activity = select( max_clients + 1 , &fdset , NULL , NULL , NULL);
-//        if ((activity < 0) && (errno != EINTR)) {
-//            printf("select error");
-//        }
         printf("Server: listening to fdset...\n");
         if((select( max_clients + 1 , &fdset , NULL , NULL , NULL)) < 0) // indefinitely
             printf("Select error\n");
@@ -125,13 +121,12 @@ int main(int argc, char *argv[]) {
                     line[MAX] = '\0';
                     if(strcmp(line, "exit") == 0)
                         goto a;
-                    send(sd , line , strlen(line) , 0 );
                     // notify all other connected clients about message
-//                    for(unsigned int j = 0; j < max_clients; j++) {
-////                        if(sd == j)
-////                            continue;
-//                        send(client_socks[j], line, strlen(line), 0);
-//                    }
+                    for(unsigned int j = 0; j < max_clients; j++) {
+                        if(sd == client_socks[j])
+                            continue;
+                        send(client_socks[j], line, strlen(line), 0);
+                    }
                 }
             }
         }
