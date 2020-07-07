@@ -21,20 +21,43 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     int n;
-    char line[MAX], ans[MAX];
+    char line[MAX] ={0}, ans[MAX] = {0};
+    pid_t pid;
 
-    printf("Processing loop\n");
-    while(1) {
-        bzero(line, MAX);
-        fgets(line, MAX, stdin);
-        line[strlen(line) - 1] = 0;
-        if(line[0] == 0) {
-            printf("Nothing entered exiting..\n");
-            exit(0);
+    if((pid = fork()) < 0) {
+        perror("fork");
+    } else if(pid == 0) {
+        // child
+        printf("child initiated\n");
+        while(1) {
+            bzero(line, MAX);
+            fgets(line, MAX, stdin);
+            line[strlen(line) - 1] = 0;
+            if(line[0] == 0) {
+                printf("Nothing entered exiting..\n");
+                exit(0);
+            }
+            if((write(sock, line, MAX)) < 0) {
+                perror("write");
+                exit(1);
+            }
+            printf("Sent message: %s\n", line);
+            if(strcmp(line, "exit") == 0)
+                exit(0);
         }
-        n = write(sock, line, MAX);
-        printf("Sent message: %s\n", line);
-        n = read(sock, ans, MAX);
-        printf("Received message: %s\n", line);
+    } else {
+        // parent
+        printf("Processing loop\n");
+        while(1) {
+            if((n = read(sock, ans, MAX)) < 0) {
+                perror("read");
+                exit(1);
+            } else if(n == 0) {
+                printf("Server disconnected.. exiting");
+                exit(1);
+            }
+            printf("Received message: %s\n", ans);
+            memset(ans, 0, sizeof(ans));
+        }
     }
 }

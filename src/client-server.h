@@ -16,5 +16,6 @@
 #define SERVER_HOST "localhost"
 #define SERVER_IP "127.0.0.1"
 #define SERVER_PORT 1234
+struct sockaddr_in server_addr;
 
 #endif //PROCSYS_CLIENT_SERVER_H
