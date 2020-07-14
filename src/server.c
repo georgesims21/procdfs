@@ -68,16 +68,16 @@ int add_socket(int client_socks[], int new_sock) {
     }
     return -1; // array full
 }
-void disconnect_sock(int client_socks[], struct sockaddr_in server_add, int sd, int len, int arrpos) {
+void disconnect_sock(int client_socks[], struct sockaddr_in *server_add, int sd, int len, int arrpos) {
     /*
      * TODO
      *  - [ ] error checking for close method
      */
 
     // to be used in a loop
-    getpeername(sd, (struct sockaddr*)&server_add , (socklen_t *)&len);
+    getpeername(sd, (struct sockaddr*)server_add , (socklen_t *)&len);
     printf("Host disconnected , ip %s , port %d \n",
-           inet_ntoa(server_addr.sin_addr), ntohs(server_add.sin_port));
+           inet_ntoa(server_add->sin_addr), ntohs(server_add->sin_port));
 
     //Close the socket and mark as 0 in list for reuse
     close(sd);
@@ -91,7 +91,59 @@ void notify_clients(int client_socks[], int sd, char *line) {
     }
 }
 
+int listenfds(int client_socks[], int server_sock, fd_set *fdset, int sd) {
+    int maxsd = 0;
+    FD_ZERO(fdset);
+    FD_SET(server_sock, fdset);
+    maxsd = add_clients(client_socks, sd, server_sock, fdset);
+    if((select( MAX_CLIENTS + 1, fdset, NULL,
+                NULL, NULL)) < 0) { // indefinitely (timeout = NULL)
+        perror("select");
+        exit(EXIT_FAILURE);
+    }
+    return maxsd;
+}
 
+void accept_connection(int client_socks[], int server_sock, int new_sock, int len, char *message,
+        struct sockaddr_in *server_add) {
+    if ((new_sock = accept(server_sock,
+                           (struct sockaddr *)server_add, (socklen_t *)&len)) < 0) {
+        perror("accept");
+        exit(EXIT_FAILURE);
+    }
+    printf("New connection , socket fd is %d , ip is : %s , port : %d\n", new_sock,
+           inet_ntoa(server_add->sin_addr), ntohs(server_add->sin_port));
+
+    if(send(new_sock, message, strlen(message), 0) != strlen(message)) {
+        perror("send");
+        exit(EXIT_FAILURE);
+    }
+    if(add_socket(client_socks, new_sock) < 0)
+        printf("socket fd array full!");
+}
+
+char handle_client(int client_socks[], int sd, int len, int i, char *line) {
+    /*
+     * TODO
+     *  - [ ] Handle the line[MAX-1] hack
+     */
+    if ((read(sd, line, MAX)) == 0) {
+        //Somebody disconnected
+        disconnect_sock(client_socks, &server_addr, sd, len, i);
+        return 1;
+    }
+    // Client message
+    line[MAX - 1] = '\0';
+    if(strcmp(line, "exit") == 0) {
+        disconnect_sock(client_socks, &server_addr, sd, len, i);
+        return 1;
+    }
+    return 0;
+}
+
+void server_loop() {
+
+}
 int main(int argc, char *argv[]) {
 
     int client_socks[MAX_CLIENTS] = {0}, new_sock = 0, sd = 0, maxsd = 0, server_sock = 0, len = 0;
@@ -105,52 +157,19 @@ int main(int argc, char *argv[]) {
             inet_ntoa(server_addr.sin_addr) , ntohs(server_addr.sin_port));
 
     while(1) { // for accepting connections
-        FD_ZERO(&fdset);
-        FD_SET(server_sock, &fdset);
-        maxsd = add_clients(client_socks, sd, server_sock, &fdset);
-        if((select( MAX_CLIENTS + 1, &fdset, NULL,
-                NULL, NULL)) < 0) { // indefinitely (timeout = NULL)
-            perror("select");
-            exit(EXIT_FAILURE);
-        }
-
+        listenfds(client_socks, server_sock, &fdset, sd);
         //If something happened on the master socket, then its an incoming connection
         if (FD_ISSET(server_sock, &fdset)) {
-            if ((new_sock = accept(server_sock,
-                                     (struct sockaddr *)&server_addr, (socklen_t *)&len)) < 0) {
-                perror("accept");
-                exit(EXIT_FAILURE);
-            }
-            printf("New connection , socket fd is %d , ip is : %s , port : %d\n", new_sock,
-                    inet_ntoa(server_addr.sin_addr), ntohs(server_addr.sin_port));
-
-            if(send(new_sock, message, strlen(message), 0) != strlen(message)) {
-                perror("send");
-            }
-           if(add_socket(client_socks, new_sock) < 0)
-               printf("socket fd array full!");
+            accept_connection(client_socks, server_sock, new_sock, len, message, &server_addr);
         }
-
         //else its some IO operation on some other socket
         for (i = 0; i < MAX_CLIENTS; i++) {
             sd = client_socks[i];
             if (FD_ISSET(sd , &fdset)) {
-                //Check if it was for closing , and also read the
-                //incoming message
-                if ((read(sd, line, MAX)) == 0) {
-                    //Somebody disconnected
-                    disconnect_sock(client_socks, server_addr, sd, len, i);
-                }
-                else {
-                    // Client message
-                    line[MAX] = '\0';
-                    if(strcmp(line, "exit") == 0) {
-                        disconnect_sock(client_socks, server_addr, sd, len, i);
-                        continue; // avoid sending 'exit' to other clients
-                    }
+                //Check if it was for closing , and also read the incoming message
+                if(handle_client(client_socks, sd, len, i, line) == 0)
                     // notify all other connected clients about message
                     notify_clients(client_socks, sd, line);
-                }
             }
         }
     }
