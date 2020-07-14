@@ -1,6 +1,5 @@
 #include "client-server.h"
 
-struct sockaddr_in server_addr;
 int sock, r;
 
 int main(int argc, char *argv[]) {
@@ -9,11 +8,6 @@ int main(int argc, char *argv[]) {
         perror("socket\n");
         exit(1);
     }
-
-    printf("filling sockaddr struct\n");
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(SERVER_PORT); // htons converts int to network byte order
-    server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
     printf("Binding socket to server address\n");
     if((r = connect(sock, (struct sockaddr*)&server_addr, sizeof(server_addr))) < 0) {
