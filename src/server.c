@@ -6,12 +6,10 @@
  *  - [x] Basic client-server model
  *  - [x] Hold more than 1 connection (with comms.)
  *  - [x] Ping messages from server to all clients (notification)
- *  - [ ] Organise into functions
- *      - maxsd isn't used after is is assigned
- *  - [ ] Make a notify setting
+ *  - [x] Organise into functions
+ *  - [ ] maxsd isn't used after is is assigned
  *  - [ ] Make the server use one of the procsys filesystems as a client
  */
-
 
 int init_server(int queue_len, struct sockaddr_in *server_add) {
     int opt = 1, server_sock = 0;
