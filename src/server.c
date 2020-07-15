@@ -1,8 +1,6 @@
 #include "client-server.h"
-//#include "server.h"
-
-#define MAX_CLIENTS 10
-
+#include "server.h"
+#include <libnet.h>
 /*
  * TODO
  *  - [x] Basic client-server model
@@ -56,19 +54,21 @@ int add_clients(int socket_set[], int sd, int maxsd, fd_set *newfdset) {
     }
     return maxsd;
 }
-int add_socket(int client_socks[], int new_sock) {
+
+int add_socket(int socket_set[], int new_sock) {
     //add new socket to array of sockets
     for(unsigned int i = 0; i < MAX_CLIENTS; i++) {
         //if position is empty
-        if(client_socks[i] == 0) {
-            client_socks[i] = new_sock;
+        if(socket_set[i] == 0) {
+            socket_set[i] = new_sock;
             printf("Adding to list of sockets as %d\n" , i);
             return 0;
         }
     }
     return -1; // array full
 }
-void disconnect_sock(int client_socks[], struct sockaddr_in *server_add, int sd, int len, int arrpos) {
+
+void disconnect_sock(int socket_set[], struct sockaddr_in *server_add, int sd, int len, int arrpos) {
     /*
      * TODO
      *  - [ ] error checking for close method
@@ -81,22 +81,23 @@ void disconnect_sock(int client_socks[], struct sockaddr_in *server_add, int sd,
 
     //Close the socket and mark as 0 in list for reuse
     close(sd);
-    client_socks[arrpos] = 0;
+    socket_set[arrpos] = 0;
 }
-void notify_clients(int client_socks[], int sd, char *line) {
+
+void notify_clients(int socket_set[], int sd, char *line) {
     for(unsigned int j = 0; j < MAX_CLIENTS; j++) {
-        if(sd == client_socks[j])
+        if(sd == socket_set[j])
             continue;
-        send(client_socks[j], line, strlen(line), 0);
+        send(socket_set[j], line, strlen(line), 0);
     }
 }
 
-int listenfds(int client_socks[], int server_sock, fd_set *fdset, int sd) {
+int listenfds(int socket_set[], int server_sock, fd_set *fds, int sd) {
     int maxsd = 0;
-    FD_ZERO(fdset);
-    FD_SET(server_sock, fdset);
-    maxsd = add_clients(client_socks, sd, server_sock, fdset);
-    if((select( MAX_CLIENTS + 1, fdset, NULL,
+    FD_ZERO(fds);
+    FD_SET(server_sock, fds);
+    maxsd = add_clients(socket_set, sd, server_sock, fds);
+    if((select( MAX_CLIENTS + 1, fds, NULL,
                 NULL, NULL)) < 0) { // indefinitely (timeout = NULL)
         perror("select");
         exit(EXIT_FAILURE);
@@ -104,7 +105,7 @@ int listenfds(int client_socks[], int server_sock, fd_set *fdset, int sd) {
     return maxsd;
 }
 
-void accept_connection(int client_socks[], int server_sock, int new_sock, int len, char *message,
+void accept_connection(int socket_set[], int server_sock, int new_sock, int len, char *message,
         struct sockaddr_in *server_add) {
     if ((new_sock = accept(server_sock,
                            (struct sockaddr *)server_add, (socklen_t *)&len)) < 0) {
@@ -118,46 +119,37 @@ void accept_connection(int client_socks[], int server_sock, int new_sock, int le
         perror("send");
         exit(EXIT_FAILURE);
     }
-    if(add_socket(client_socks, new_sock) < 0)
+    if(add_socket(socket_set, new_sock) < 0)
         printf("socket fd array full!");
 }
 
-char handle_client(int client_socks[], int sd, int len, int i, char *line) {
+char handle_client(int socket_set[], int sd, int len, int i, char *line, struct sockaddr_in *server_add) {
     /*
      * TODO
      *  - [ ] Handle the line[MAX-1] hack
      */
     if ((read(sd, line, MAX)) == 0) {
         //Somebody disconnected
-        disconnect_sock(client_socks, &server_addr, sd, len, i);
+        disconnect_sock(socket_set, server_add, sd, len, i);
         return 1;
     }
     // Client message
     line[MAX - 1] = '\0';
     if(strcmp(line, "exit") == 0) {
-        disconnect_sock(client_socks, &server_addr, sd, len, i);
+        disconnect_sock(socket_set, server_add, sd, len, i);
         return 1;
     }
     return 0;
 }
 
-void server_loop() {
-
-}
-int main(int argc, char *argv[]) {
-
-    int client_socks[MAX_CLIENTS] = {0}, new_sock = 0, sd = 0, maxsd = 0, server_sock = 0, len = 0;
-    char line[MAX] = {0}, message[MAX] = {0};
+void server_loop(int server_sock, int len, char *message) {
+    int client_socks[MAX_CLIENTS] = {0}, new_sock = 0, sd = 0, maxsd = 0;
     unsigned int i = 0;
+    char line[MAX] = {0};
     fd_set fdset;
 
-    server_sock = init_server(10, &server_addr);
-    len = sizeof(server_addr);
-    sprintf(message, "Connected to server address at %s and port %hu...",
-            inet_ntoa(server_addr.sin_addr) , ntohs(server_addr.sin_port));
-
     while(1) { // for accepting connections
-        listenfds(client_socks, server_sock, &fdset, sd);
+        maxsd = listenfds(client_socks, server_sock, &fdset, sd);
         //If something happened on the master socket, then its an incoming connection
         if (FD_ISSET(server_sock, &fdset)) {
             accept_connection(client_socks, server_sock, new_sock, len, message, &server_addr);
@@ -167,11 +159,28 @@ int main(int argc, char *argv[]) {
             sd = client_socks[i];
             if (FD_ISSET(sd , &fdset)) {
                 //Check if it was for closing , and also read the incoming message
-                if(handle_client(client_socks, sd, len, i, line) == 0)
+                if(handle_client(client_socks, sd, len, i, line, &server_addr) == 0)
                     // notify all other connected clients about message
                     notify_clients(client_socks, sd, line);
             }
         }
     }
+}
+
+void run_server(void) {
+    int server_sock = 0, len = 0;
+    char message[MAX] = {0};
+
+    server_sock = init_server(10, &server_addr);
+    len = sizeof(server_addr);
+    sprintf(message, "Connected to server address at %s and port %hu...",
+            inet_ntoa(server_addr.sin_addr) , ntohs(server_addr.sin_port));
+
+    server_loop(server_sock, len, message);
+}
+
+int main(int argc, char *argv[]) {
+    run_server();
+    return 0;
 }
 
