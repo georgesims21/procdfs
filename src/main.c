@@ -31,7 +31,17 @@
 #endif
 
 #include "fileops.h"
+#include "client-server.h"
+#include "client.h"
 
+/*
+ * TODO
+ *  [ ] Set up basic comms between server and client fs
+ *      - fs has one process to handle reading and writing
+ *      - if a read comes then must also need a write, make sure it blocks on read
+ *      - server needs both read and write processes to communicate with multiple clients
+ *          * if proves hard then set up for one and build up from there
+ */
 static void *procsys_init(struct fuse_conn_info *conn,
                       struct fuse_config *cfg) {
 
@@ -48,6 +58,24 @@ static void *procsys_init(struct fuse_conn_info *conn,
     cfg->entry_timeout = 0;
     cfg->attr_timeout = 0;
     cfg->negative_timeout = 0;
+
+    // init log
+    time_t t = time(NULL);
+    struct tm tm = *localtime(&t);
+    lprintf("--%02d/%02d %02d:%02d:%02d--\n", tm.tm_mday, tm.tm_mon, tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+    // init client
+    int sock = init_client(&server_addr);
+    int pid;
+    if((pid = fork()) < 0) {
+        // error
+        perror("fork");
+        exit(EXIT_FAILURE);
+    } else if (pid == 0) {
+        // child
+        printf("This is the child\n");
+        read_loop(sock);
+    }
 
     return NULL;
 }
