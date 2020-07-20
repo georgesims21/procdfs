@@ -58,10 +58,12 @@ TODO:
       Cheap and dirty: there is a server and all others are clients are connected
       (basic client/server model that I assumed)
 
-    - [ ] 2.1: Build a basic client-server model and assume a TCP connection
-    - [ ] 2.2: Convert it into a secure client-server with openssl libs
+    - [x] 2.1: Build a basic client-server model and assume a TCP connection
     - [ ] 2.3: Merge logic into filesystem
+      - [ ] 2.3.1: First model should use server to do all work and comms between clients
+      - [ ] 2.3.2: Second model should have all fs' as servers and clients to each other
     - [ ] 2.4: Congregate some files and run tests with net-tools
+    - [ ] 2.5 (extra): Convert it into a secure client-server with openssl libs
  
 - [ ] 3: **Go from 2 to n multiple clients**   
       Should be smooth if using multiple vagrant vms as clients to test
