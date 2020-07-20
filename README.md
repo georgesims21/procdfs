@@ -46,7 +46,7 @@ TODO:
     - [ ] 1.4 (extra): Fix bottleneck in the getattrb operation
         - Due to proc files being 0 size, if you don't manually get the size and save it in the stat struct then no cat commands print. BUT this introduces huge bottleneck when ls'ing all contents
 
-- [ ] 2: **Combine the procfs of two file systems**   
+- [ ] 2: **Combine the procfs of two file systems** [DEADLINE: 24/07]   
       Assume there is a server and the rest are client filesystems. Assume already
       established tcp connection between the server (my machine) where I am running
       the uberproc, and the client machine. This must be done in the FUSE fs code.
