@@ -18,4 +18,7 @@
 #define SERVER_PORT 1234
 struct sockaddr_in server_addr;
 
+#define CONN_MSG 1
+#define REG_MSG 2
+
 #endif //PROCSYS_CLIENT_SERVER_H
