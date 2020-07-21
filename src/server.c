@@ -1,5 +1,6 @@
 #include "client-server.h"
 #include "server.h"
+#include "log.h"
 
 /*
  * TODO
@@ -9,12 +10,17 @@
  *  - [x] Organise into functions
  *  - [ ] maxsd isn't used after is is assigned
  *  - [ ] Make the server use one of the procsys filesystems as a client
+ *      - [ ] Make a read and write process for the server to communicate with fs
  */
+
+struct sockaddr_in server_addr;
 
 int init_server(int queue_len, struct sockaddr_in *server_add) {
     int opt = 1, server_sock = 0;
 
-    printf("Creating TCP stream socket\n");
+    timestamp_log("server");
+
+    lprintf("{server}Creating TCP stream socket\n");
     if((server_sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("socket\n");
         exit(EXIT_FAILURE);
@@ -25,18 +31,19 @@ int init_server(int queue_len, struct sockaddr_in *server_add) {
         exit(EXIT_FAILURE);
     }
 
-    printf("filling sockaddr struct\n");
+    lprintf("{server}filling sockaddr struct\n");
     server_add->sin_family = AF_INET;
     server_add->sin_port = htons(SERVER_PORT); // htons converts int to network byte order
     server_add->sin_addr.s_addr = htonl(INADDR_ANY);
 
-    printf("Binding socket to server address\n");
+    lprintf("{server}Binding socket to server address\n");
     if(bind(server_sock, (struct sockaddr*)server_add, sizeof(*server_add)) < 0) {
         perror("bind");
         exit(EXIT_FAILURE);
     }
 
-    printf("server is listening on port: %d\n", SERVER_PORT);
+    lprintf("{server}server is listening on port: %d\n", SERVER_PORT);
+    printf("Server initiated successfully\n");
     listen(server_sock, queue_len);
     return server_sock;
 }
@@ -59,7 +66,7 @@ int add_socket(int socket_set[], int new_sock) {
         //if position is empty
         if(socket_set[i] == 0) {
             socket_set[i] = new_sock;
-            printf("Adding to list of sockets as %d\n" , i);
+            lprintf("{server}Adding to list of sockets as %d\n" , i);
             return 0;
         }
     }
@@ -74,7 +81,7 @@ void disconnect_sock(int socket_set[], struct sockaddr_in *server_add, int sd, i
 
     // to be used in a loop
     getpeername(sd, (struct sockaddr*)server_add , (socklen_t *)&len);
-    printf("Host disconnected , ip %s , port %d \n",
+    lprintf("{server}Host disconnected , ip %s , port %d \n",
            inet_ntoa(server_add->sin_addr), ntohs(server_add->sin_port));
 
     //Close the socket and mark as 0 in list for reuse
@@ -87,6 +94,26 @@ void notify_clients(int socket_set[], int sd, char *line) {
         if(sd == socket_set[j])
             continue;
         send(socket_set[j], line, strlen(line), 0);
+    }
+}
+
+void write_loop(int sock) {
+    char line[MAX] = {0};
+    while(1) {
+        bzero(line, MAX);
+        fgets(line, MAX, stdin);
+        line[strlen(line) - 1] = 0;
+        if(line[0] == 0) {
+            lprintf("{server}Nothing entered exiting..\n");
+            exit(0);
+        }
+        if((write(sock, line, MAX)) < 0) {
+            perror("write");
+            exit(1);
+        }
+        lprintf("{server}Sent message: %s\n", line);
+        if(strcmp(line, "exit") == 0)
+            exit(0);
     }
 }
 
@@ -110,7 +137,7 @@ void accept_connection(int socket_set[], int server_sock, int new_sock, int len,
         perror("accept");
         exit(EXIT_FAILURE);
     }
-    printf("New connection , socket fd is %d , ip is : %s , port : %d\n", new_sock,
+    lprintf("{server}New connection , socket fd is %d , ip is : %s , port : %d\n", CONN_MSG, new_sock,
            inet_ntoa(server_add->sin_addr), ntohs(server_add->sin_port));
 
     if(send(new_sock, message, strlen(message), 0) != strlen(message)) {
@@ -118,7 +145,7 @@ void accept_connection(int socket_set[], int server_sock, int new_sock, int len,
         exit(EXIT_FAILURE);
     }
     if(add_socket(socket_set, new_sock) < 0)
-        printf("socket fd array full!");
+        lprintf("{server}socket fd array full!");
 }
 
 char handle_client(int socket_set[], int sd, int len, int i, char *line, struct sockaddr_in *server_add) {
@@ -166,13 +193,13 @@ void server_loop(int server_sock, int len, char *message) {
 }
 
 void run_server(void) {
-    int server_sock = 0, len = 0;
+    int server_sock = 0, len = 0, pid = 0;
     char message[MAX] = {0};
 
     server_sock = init_server(10, &server_addr);
     len = sizeof(server_addr);
-    sprintf(message, "Connected to server address at %s and port %hu...",
-            inet_ntoa(server_addr.sin_addr) , ntohs(server_addr.sin_port));
+    sprintf(message, "{server}%dConnected to server address at %s and port %hu...",
+            CONN_MSG, inet_ntoa(server_addr.sin_addr) , ntohs(server_addr.sin_port));
 
     server_loop(server_sock, len, message);
 }

@@ -7,6 +7,8 @@ void read_loop(int sock);
 void read_write_loop(int sock);
 int parse_message(char *message);
 void lprintf(const char *fmt, ...);
+void read_server(int sock);
+void write_server(char *line, int sock);
 void run_client(void);
 
 #endif //PROCSYS_CLIENT_H
