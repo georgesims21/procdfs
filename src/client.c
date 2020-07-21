@@ -46,15 +46,6 @@ void write_loop(char *line, int sock) {
     }
 }
 
-void write_server(char *line, int sock) {
-    if((write(sock, line, MAX)) < 0) {
-        perror("write");
-        exit(1);
-    }
-    lprintf("{client}Sent message to server: %s\n", line);
-
-}
-
 int parse_message(char *message) {
     // ASCII magic: https://stackoverflow.com/questions/5029840/convert-char-to-int-in-c-and-c
     int flag = message[0] - '0';
@@ -63,10 +54,6 @@ int parse_message(char *message) {
 }
 
 void read_loop(int sock) {
-    /*
-     * TODO
-     *  bug : getting 0 from read call, server disconnects when client connects
-     */
 
     int n;
     char ans[MAX] = {0};
@@ -79,55 +66,23 @@ void read_loop(int sock) {
             lprintf("{client}Server disconnected.. exiting\n");
             exit(1);
         }
+        lprintf("{client} before giving to parse: %s\n", ans);
         switch(parse_message(ans)) {
             case CONN_MSG:
                 lprintf("{client}[connection message] %s\n", ans);
                 break;
             case REG_MSG:
-                // Will need to run methods from here when server requests a file
-                lprintf("{client}[regular message] %s\n", ans);
+                lprintf("{client}[message] %s\n", ans);
                 break;
             default:
-                lprintf("{client}[message] %s\n", ans);
+                lprintf("{client}[other] %s\n", ans);
                 break;
         }
         memset(ans, 0, sizeof(ans));
     }
 }
 
-void read_server(int sock) {
-    /*
-     * TODO
-     *  [ ] log function not writing messages
-     *      - Server is disconnecting, check return values of read to see if error checking is right
-     */
-
-    int n;
-    char ans[MAX] = {0};
-
-    if((n = read(sock, ans, MAX)) < 0) {
-        perror("read");
-        exit(1);
-    } else if(n == 0) {
-        lprintf("{client}Server disconnected.. exiting\n");
-        exit(1);
-    }
-    switch(parse_message(ans)) {
-        case CONN_MSG:
-            lprintf("{client}[connection message] %s\n", ans);
-            break;
-        case REG_MSG:
-            lprintf("{client}[regular message] %s\n", ans);
-            break;
-        default:
-            lprintf("{client}[message] %s\n", ans);
-            break;
-    }
-    memset(ans, 0, sizeof(ans));
-}
-
 void read_write_loop(int sock) {
-
     char line[MAX] ={0}, ans[MAX] = {0};
     pid_t pid;
 

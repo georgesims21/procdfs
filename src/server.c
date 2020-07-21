@@ -10,10 +10,7 @@
  *  - [x] Organise into functions
  *  - [ ] maxsd isn't used after is is assigned
  *  - [ ] Make the server use one of the procsys filesystems as a client
- *      - [ ] Make a read and write process for the server to communicate with fs
  */
-
-struct sockaddr_in server_addr;
 
 int init_server(int queue_len, struct sockaddr_in *server_add) {
     int opt = 1, server_sock = 0;
@@ -43,7 +40,6 @@ int init_server(int queue_len, struct sockaddr_in *server_add) {
     }
 
     lprintf("{server}server is listening on port: %d\n", SERVER_PORT);
-    printf("Server initiated successfully\n");
     listen(server_sock, queue_len);
     return server_sock;
 }
@@ -91,29 +87,9 @@ void disconnect_sock(int socket_set[], struct sockaddr_in *server_add, int sd, i
 
 void notify_clients(int socket_set[], int sd, char *line) {
     for(unsigned int j = 0; j < MAX_CLIENTS; j++) {
-        if(sd == socket_set[j])
-            continue;
+//        if(sd == socket_set[j])
+//            continue;
         send(socket_set[j], line, strlen(line), 0);
-    }
-}
-
-void write_loop(int sock) {
-    char line[MAX] = {0};
-    while(1) {
-        bzero(line, MAX);
-        fgets(line, MAX, stdin);
-        line[strlen(line) - 1] = 0;
-        if(line[0] == 0) {
-            lprintf("{server}Nothing entered exiting..\n");
-            exit(0);
-        }
-        if((write(sock, line, MAX)) < 0) {
-            perror("write");
-            exit(1);
-        }
-        lprintf("{server}Sent message: %s\n", line);
-        if(strcmp(line, "exit") == 0)
-            exit(0);
     }
 }
 
@@ -137,7 +113,7 @@ void accept_connection(int socket_set[], int server_sock, int new_sock, int len,
         perror("accept");
         exit(EXIT_FAILURE);
     }
-    lprintf("{server}New connection , socket fd is %d , ip is : %s , port : %d\n", CONN_MSG, new_sock,
+    lprintf("{server}New connection , socket fd is %d , ip is : %s , port : %d\n", new_sock,
            inet_ntoa(server_add->sin_addr), ntohs(server_add->sin_port));
 
     if(send(new_sock, message, strlen(message), 0) != strlen(message)) {
@@ -153,6 +129,7 @@ char handle_client(int socket_set[], int sd, int len, int i, char *line, struct 
      * TODO
      *  - [ ] Handle the line[MAX-1] hack
      */
+    char tmp[MAX] = {0};
     if ((read(sd, line, MAX)) == 0) {
         //Somebody disconnected
         disconnect_sock(socket_set, server_add, sd, len, i);
@@ -164,6 +141,8 @@ char handle_client(int socket_set[], int sd, int len, int i, char *line, struct 
         disconnect_sock(socket_set, server_add, sd, len, i);
         return 1;
     }
+    sprintf(tmp, "%d%s", REG_MSG, line);
+    sprintf(line, "%s", tmp);
     return 0;
 }
 
@@ -184,22 +163,23 @@ void server_loop(int server_sock, int len, char *message) {
             sd = client_socks[i];
             if (FD_ISSET(sd , &fdset)) {
                 //Check if it was for closing , and also read the incoming message
-                if(handle_client(client_socks, sd, len, i, line, &server_addr) == 0)
+                if(handle_client(client_socks, sd, len, i, line, &server_addr) == 0) {
                     // notify all other connected clients about message
                     notify_clients(client_socks, sd, line);
+                }
             }
         }
     }
 }
 
 void run_server(void) {
-    int server_sock = 0, len = 0, pid = 0;
+    int server_sock = 0, len = 0;
     char message[MAX] = {0};
 
     server_sock = init_server(10, &server_addr);
     len = sizeof(server_addr);
-    sprintf(message, "{server}%dConnected to server address at %s and port %hu...",
-            CONN_MSG, inet_ntoa(server_addr.sin_addr) , ntohs(server_addr.sin_port));
+    sprintf(message, "%dConnected to server address at %s and port %hu...", CONN_MSG,
+            inet_ntoa(server_addr.sin_addr) , ntohs(server_addr.sin_port));
 
     server_loop(server_sock, len, message);
 }

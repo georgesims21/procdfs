@@ -1,30 +1,20 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdarg.h>
-#include <unistd.h>
-#include <time.h>
 #include "log.h"
-
-void timestamp_log(char *id) {
-    // init log
-    time_t t = time(NULL);
-    struct tm tm = *localtime(&t);
-    lprintf("--%s @  %02d/%02d %02d:%02d:%02d--\n", id, tm.tm_mday, tm.tm_mon, tm.tm_hour,
-            tm.tm_min, tm.tm_sec);
-}
-
-void pprintf(char *message) {
-    FILE *fp;
-    chdir("/home/george/github/procsys");
-
-    if((fp = fopen("procsys.log", "w+")) < 0 ) {
-        perror("fopen");
-        exit(EXIT_FAILURE);
-    }
-
-    fprintf(fp, "%s\n", message);
-    fclose(fp);
-}
+#include <stdio.h>
+#include <unistd.h>
+#include <stdarg.h>
+#include <time.h>
+//void pprintf(char *message) {
+//    FILE *fp;
+//    chdir("/home/george/github/procsys");
+//
+//    if((fp = fopen("procsys.log", "w+")) < 0 ) {
+//        perror("fopen");
+//        exit(EXIT_FAILURE);
+//    }
+//
+//    fprintf(fp, "%s\n", message);
+//    fclose(fp);
+//}
 
 void lprintf(const char *fmt, ...) {
 //    https://stackoverflow.com/questions/7031116/how-to-create-function-like-printf-variable-argument
@@ -37,4 +27,11 @@ void lprintf(const char *fmt, ...) {
     vfprintf(fp, fmt, arg);
     va_end(arg);
     fclose(fp);
+}
+void timestamp_log(char *id) {
+    // init log
+    time_t t = time(NULL);
+    struct tm tm = *localtime(&t);
+    lprintf("\n\n--%s @  %02d/%02d %02d:%02d:%02d--\n", id, tm.tm_mday, tm.tm_mon, tm.tm_hour,
+            tm.tm_min, tm.tm_sec);
 }
