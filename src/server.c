@@ -12,6 +12,8 @@
  *  - [ ] Make the server use one of the procsys filesystems as a client
  */
 
+struct sockaddr_in server_addr;
+
 int init_server(int queue_len, struct sockaddr_in *server_add) {
     int opt = 1, server_sock = 0;
 
