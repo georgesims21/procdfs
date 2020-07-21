@@ -66,7 +66,6 @@ void read_loop(int sock) {
             lprintf("{client}Server disconnected.. exiting\n");
             exit(1);
         }
-        lprintf("{client} before giving to parse: %s\n", ans);
         switch(parse_message(ans)) {
             case CONN_MSG:
                 lprintf("{client}[connection message] %s\n", ans);
@@ -105,8 +104,8 @@ void run_client(void) {
     sock = init_client(&server_addr);
     read_write_loop(sock);
 }
-
-int main(int argc, char *argv[]) {
-    run_client();
-    return 0;
-}
+//
+//int main(int argc, char *argv[]) {
+//    run_client();
+//    return 0;
+//}

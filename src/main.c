@@ -33,6 +33,7 @@
 #include "fileops.h"
 #include "client-server.h"
 #include "client.h"
+#include "log.h"
 
 /*
  * TODO
@@ -59,11 +60,6 @@ static void *procsys_init(struct fuse_conn_info *conn,
     cfg->attr_timeout = 0;
     cfg->negative_timeout = 0;
 
-    // init log
-    time_t t = time(NULL);
-    struct tm tm = *localtime(&t);
-    lprintf("--%02d/%02d %02d:%02d:%02d--\n", tm.tm_mday, tm.tm_mon, tm.tm_hour, tm.tm_min, tm.tm_sec);
-
     // init client
     int sock = init_client(&server_addr);
     int pid;
@@ -73,7 +69,6 @@ static void *procsys_init(struct fuse_conn_info *conn,
         exit(EXIT_FAILURE);
     } else if (pid == 0) {
         // child
-        printf("This is the child\n");
         read_loop(sock);
     }
 
