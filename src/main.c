@@ -35,14 +35,17 @@
 #include "client.h"
 #include "log.h"
 
+int server_sock;
 /*
  * TODO
- *  [ ] Set up basic comms between server and client fs
- *      - fs has one process to handle reading and writing
- *      - if a read comes then must also need a write, make sure it blocks on read
- *      - server needs both read and write processes to communicate with multiple clients
- *          * if proves hard then set up for one and build up from there
+ *  * main
+ *  - [ ] error checking to see if read op actually read all of the file
+ *  - [ ] prepend the path to the file content
+ *       - remove the process number
+ *  - [ ] setjmp
+ *  - [ ] send data to writer
  */
+
 static void *procsys_init(struct fuse_conn_info *conn,
                       struct fuse_config *cfg) {
 
@@ -61,7 +64,7 @@ static void *procsys_init(struct fuse_conn_info *conn,
     cfg->negative_timeout = 0;
 
     // init client
-    int sock = init_client(&server_addr);
+    server_sock = init_client(&server_addr);
     int pid;
     if((pid = fork()) < 0) {
         // error
@@ -69,7 +72,7 @@ static void *procsys_init(struct fuse_conn_info *conn,
         exit(EXIT_FAILURE);
     } else if (pid == 0) {
         // child
-        read_loop(sock);
+        read_loop(server_sock);
     }
 
     return NULL;
@@ -167,11 +170,15 @@ static int procsys_open(const char *path, struct fuse_file_info *fi) {
 static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
                     struct fuse_file_info *fi) {
 
+
+
     int fd;
     int res;
+    char line[MAX] = "This is a test";
+    const char *fp = final_path(path);
 
     if(fi == NULL)
-        fd = openat(AT_FDCWD, final_path(path), O_RDONLY);
+        fd = openat(AT_FDCWD, fp, O_RDONLY);
     else {
         fd = fi->fh;
     }

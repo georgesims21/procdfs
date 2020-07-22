@@ -154,3 +154,10 @@ int dir_size(const char *path) {
     }
     return i;
 }
+
+int parse_message(char *message) {
+    // ASCII magic: https://stackoverflow.com/questions/5029840/convert-char-to-int-in-c-and-c
+    int flag = message[0] - '0';
+    memmove(message, message + 1, strlen(message));
+    return flag;
+}
