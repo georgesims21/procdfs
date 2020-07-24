@@ -36,16 +36,17 @@
 #include "writer.h"
 #include "log.h"
 
+jmp_buf readjmpbuf;
 int server_sock;
 
 /*
  * TODO
  *  * main
  *  - [ ] error checking to see if read op actually read all of the file
- *  - [ ] prepend the path to the file content
- *       - remove the process number
+ *  - [x] prepend the path to the file content
  *  - [ ] setjmp
  *  - [ ] send data to writer
+ *  - [ ] remove the process number
  */
 
 static void *procsys_init(struct fuse_conn_info *conn,
@@ -201,11 +202,18 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
 
     prepend_content(buffer, s);
     prepend_path(fp, s);
-    prepend_flag(CNT_MSG_CLI, s);
+    prepend_flag(NME_MSG_CLI, s);
     s[MAX - 1] = '\0'; // for safety
 
-    lprintf("{client}sending to server: %s\n", s);
+//    lprintf("{client}sending to server: %s\n", s);
     write(server_sock, s, strlen(s));
+
+    // setjmp
+    int r = -1;
+//    if ((r = setjmp(readjmpbuf)) == 0)
+//        wait(pid);
+
+    snprintf(buf, strlen(s), "%s", s);
     return res;
 }
 

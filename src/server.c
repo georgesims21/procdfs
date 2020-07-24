@@ -3,20 +3,21 @@
 #include "log.h"
 #include "fileops.h"
 #include "reader.h"
+#include "writer.h"
 
 /*
  * TODO
  *  * writer
- *  - [ ] create buf containing file path
- *  - [ ] prepend flag to buf (from writer api)
+ *  - [x] create buf containing file path
+ *  - [x] prepend flag to buf (from writer api)
  *  * reader
- *  - [ ] parse flag method (from reader api)
- *  - [ ] parse path method
- *  - [ ] parse content method
+ *  - [x] parse flag method (from reader api)
+ *  - [x] parse path method
+ *  - [x] parse content method
  *  * main
  *  - [ ] maxsd isn't used after is is assigned
  *  - [ ] send buf to all clients, skip fd of caller
- *  - [ ] struct containing calling clients fd with flag, path and content
+ *  - [x] struct containing calling clients fd with flag, path and content
  *  - [ ] queue data struct to hold received buffers
  *      - queue empty method: keep queue length as global and constantly check in while loop
  *  - [ ] method to congregate values from all the buffers
@@ -24,6 +25,7 @@
 
 struct sockaddr_in server_addr;
 int server_sock;
+CALLER caller = {0};
 
 int init_server(int queue_len, struct sockaddr_in *server_add) {
     int opt = 1, socket_fd;
@@ -138,12 +140,7 @@ void accept_connection(int socket_set[], int server_socket, int new_sock, int le
 }
 
 char handle_client(int socket_set[], int sd, int len, int i, char *line, struct sockaddr_in *server_add) {
-    /*
-     * TODO
-     *  - [ ] do the switch statement with the same logic as client
-     *      - prepend correct flags to each messgae: use memmove and memcpy https://stackoverflow.com/questions/2328182/prepending-to-a-string
-     *      - Check if read adds terminating char
-     */
+
     char tmp[MAX] = {0};
     char path[64] = {0};
     if ((read(sd, line, READ_MAX)) == 0) {
@@ -155,21 +152,24 @@ char handle_client(int socket_set[], int sd, int len, int i, char *line, struct 
     line[TERM_CHAR_MAX] = '\0';
 
     switch(parse_flag(line)) {
-        case CNT_MSG_CLI:
-        {
-            parse_path(path, line);
-            lprintf("{server}received message %s from client(sd){%d}\n", line, sd);
-            lprintf("{server}received path %s from client message(sd){%d}\n", path, sd);
-            break;
-        }
         case NME_MSG_CLI:
+            parse_path(path, line);
+            caller.fd = sd;
+            snprintf(caller.path, 64, "%s", path);
+            snprintf(caller.content, MAX, "%s", line);
+            lprintf("{server}[file request]for path \"%s\" received from client(sd){%d}\n",
+                    caller.path, caller.fd);
+            snprintf(line, strlen(path) + 1, "%s", path);
+            prepend_flag(REQ_MSG_SER, line);
+            break;
+        case CNT_MSG_CLI:
+            lprintf("{server}[file content]for path \"%s\" received from client(sd){%d}:\n%s",
+                    caller.path, sd, line);
+            prepend_flag(FIN_MSG_SER, line);
             break;
         default:
             break;
     }
-
-    sprintf(tmp, "%d%s", REQ_MSG_SER, line);
-    sprintf(line, "%s", tmp);
     return 0;
 }
 

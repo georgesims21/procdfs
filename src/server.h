@@ -15,4 +15,10 @@ char handle_client(int socket_set[], int sd, int len, int i, char *line, struct 
 void server_loop(int server_sock, int len, char *message);
 void run_server(void);
 
+typedef struct caller {
+    int fd;
+    char path[64];
+    char content[MAX];
+}CALLER;
+
 #endif //PROCSYS_SERVER_H

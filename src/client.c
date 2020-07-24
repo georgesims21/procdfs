@@ -18,8 +18,7 @@ QUEUE *queue;
  *          * this loop uses excess processing power when checking the queue - need another solution
  *  * reader
  *  - [x] make parse flag method - returns file path(share in reader api)
- *  - [ ] make method to fetch file content into buf
- *  - [ ] method to extract buf with final file content
+ *  - [x] make method to fetch file content into buf
  *  - [ ] longjmp() back to the client FS
  *  * main
  *  - [ ] take final buf and return it to the (read()) method
@@ -94,7 +93,7 @@ void read_loop(int sock) {
                  * TODO
                  *  [ ] prepend CNT_MSG_CLI to message content buffer before sending
                  */
-                lprintf("{client}[file request] %s\n", ans);
+                lprintf("{client}[file request]for path: \"%s\"\n", ans);
                 // from here content of the file is fetched and sent to the server
                 int fd = -1, res = 0, offset = 0, size = 0;
                 char buf[4096] = {0};
@@ -110,6 +109,7 @@ void read_loop(int sock) {
                     perror("pread");
                     exit(EXIT_FAILURE);
                 }
+                prepend_flag(CNT_MSG_CLI, buf);
                 if((write(sock, buf, strlen(buf))) < 0) {
                     perror("write");
                     exit(1);
