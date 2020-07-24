@@ -2,6 +2,7 @@
 #include "server.h"
 #include "log.h"
 #include "fileops.h"
+#include "reader.h"
 
 /*
  * TODO
@@ -152,7 +153,7 @@ char handle_client(int socket_set[], int sd, int len, int i, char *line, struct 
     // Client message
     line[TERM_CHAR_MAX] = '\0';
 
-    switch(parse_message(line)) {
+    switch(parse_flag(line)) {
         case CNT_MSG_CLI:
             lprintf("{server}received message %s from client(sd){%d}\n", line, sd);
             break;

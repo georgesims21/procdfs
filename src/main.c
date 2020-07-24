@@ -33,9 +33,11 @@
 #include "fileops.h"
 #include "client-server.h"
 #include "client.h"
+#include "writer.h"
 #include "log.h"
 
 int server_sock;
+
 /*
  * TODO
  *  * main
@@ -50,6 +52,7 @@ static void *procsys_init(struct fuse_conn_info *conn,
                       struct fuse_config *cfg) {
 
     (void) conn;
+    sleep(2); // to allow for server to start on run config
     cfg->use_ino = 1;
 
     /* Pick up changes from lower filesystem right away. This is
@@ -169,13 +172,20 @@ static int procsys_open(const char *path, struct fuse_file_info *fi) {
 
 static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
                     struct fuse_file_info *fi) {
-
-
+    /*
+     * TODO
+     *  [ ] remove pid number from the path when 1< connected
+     *  [ ] good memory management (calloc and realloc)
+     */
 
     int fd;
     int res;
-    char line[MAX] = "This is a test";
+    char buffer[MAX] = {0};
+    char s[4096] = {0};
     const char *fp = final_path(path);
+//    size_t path_len = strlen(fp);
+//    strncpy(s, fp, path_len);
+
 
     if(fi == NULL)
         fd = openat(AT_FDCWD, fp, O_RDONLY);
@@ -185,12 +195,21 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
     if (fd == -1)
         return -errno;
 
-    res = pread(fd, buf, size, offset);
+    res = pread(fd, buffer, size, offset);
     if (res == -1)
         res = -errno;
 
     if(fi == NULL)
         close(fd);
+
+//    strncat(s, buffer, strlen(buffer));
+
+    prepend_content(buffer, s);
+    prepend_path(fp, s);
+    prepend_flag(CNT_MSG_CLI, s);
+
+    lprintf("{client}sending to server: %s\n", s);
+    write(server_sock, s, strlen(s));
     return res;
 }
 

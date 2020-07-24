@@ -2,17 +2,22 @@
 #include "client.h"
 #include "log.h"
 #include "fileops.h"
+#include "reader.h"
+#include "writer.h"
+#include "queue.h"
 
 struct sockaddr_in server_addr;
+QUEUE *queue;
 
 /*
  * TODO
  *  * writer
- *  - [ ] make prepend flag method
+ *  - [x] make prepend flag method
  *  - [ ] send to server method loop
  *       - only sends if queue is non-empty, can make a global flag for now with bufsize
+ *          * this loop uses excess processing power when checking the queue - need another solution
  *  * reader
- *  - [ ] make parse flag method - returns file path(share in reader api)
+ *  - [x] make parse flag method - returns file path(share in reader api)
  *  - [ ] make method to fetch file content into buf
  *  - [ ] method to extract buf with final file content
  *  - [ ] longjmp() back to the client FS
@@ -43,22 +48,19 @@ int init_client(struct sockaddr_in *server_add) {
     return sock;
 }
 
-void write_loop(char *line, int sock) {
+void write_loop(int sock) {
+    char line[MAX] = {0};
+
+    BUFELEM *tmpbuf = {0};
     while(1) {
-        bzero(line, MAX);
-        fgets(line, MAX, stdin);
-        line[strlen(line) - 1] = 0;
-        if(line[0] == 0) {
-            lprintf("{client}Nothing entered exiting..\n");
-            exit(0);
+        if(lenq(&queue)) {
+            memset(tmpbuf, 0, sizeof(&tmpbuf));
+            tmpbuf = dequeue(&queue);
+            if((write(sock, tmpbuf->buf, strlen(tmpbuf->buf))) < 0) {
+                perror("write");
+                exit(1);
+            }
         }
-        if((write(sock, line, MAX)) < 0) {
-            perror("write");
-            exit(1);
-        }
-        lprintf("{client}Sent message: %s\n", line);
-        if(strcmp(line, "exit") == 0)
-            exit(0);
     }
 }
 
@@ -83,7 +85,7 @@ void read_loop(int sock) {
             lprintf("{client}Server disconnected.. exiting\n");
             exit(1);
         }
-        switch(parse_message(ans)) {
+        switch(parse_flag(ans)) {
             case CONN_MSG_SER:
                 lprintf("{client}[connection message] %s\n", ans);
                 break;
@@ -134,8 +136,7 @@ void read_write_loop(int sock) {
         exit(1);
     } else if(pid == 0) {
         // child
-        write_loop(line, sock);
-
+        write_loop(sock);
     } else {
         // parent
         read_loop(sock);
