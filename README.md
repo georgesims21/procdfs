@@ -46,7 +46,7 @@ TODO:
     - [ ] 1.4 (extra): Fix bottleneck in the getattrb operation
         - Due to proc files being 0 size, if you don't manually get the size and save it in the stat struct then no cat commands print. BUT this introduces huge bottleneck when ls'ing all contents
 
-- [ ] 2: **Combine the procfs of two file systems** [DEADLINE: 24/07]   
+- [ ] 2: **Combine the procfs of two file systems** [DEADLINE: ~24/07~07/08]   
       Assume there is a server and the rest are client filesystems. Assume already
       established tcp connection between the server (my machine) where I am running
       the uberproc, and the client machine. This must be done in the FUSE fs code.
@@ -62,6 +62,12 @@ TODO:
     - [ ] 2.3: Merge logic into filesystem
       - [ ] 2.3.1: First model should use server to do all work and comms between clients
           - [plan](doc/networking-read()call-flowchart.pdf)
+          - Before holiday:
+            Have a good chunk of the logic working. Missing the gap between the FS waiting 
+            and the reader process communicating with the server in the meanwhile, eventually
+            returning the congregated file to the main process, allowing it to continue.
+            When back go through the signal programming theory in "advanced programming in the linux env" book
+            to try and solve the issue with signals.
       - [ ] 2.3.2: Second model should have all fs' as servers and clients to each other
     - [ ] 2.4: Congregate some files and run tests with net-tools
     - [ ] 2.5 (extra): Convert it into a secure client-server with openssl libs
