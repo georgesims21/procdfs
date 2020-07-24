@@ -145,6 +145,7 @@ char handle_client(int socket_set[], int sd, int len, int i, char *line, struct 
      *      - Check if read adds terminating char
      */
     char tmp[MAX] = {0};
+    char path[64] = {0};
     if ((read(sd, line, READ_MAX)) == 0) {
         //Somebody disconnected
         disconnect_sock(socket_set, server_add, sd, len, i);
@@ -155,8 +156,12 @@ char handle_client(int socket_set[], int sd, int len, int i, char *line, struct 
 
     switch(parse_flag(line)) {
         case CNT_MSG_CLI:
+        {
+            parse_path(path, line);
             lprintf("{server}received message %s from client(sd){%d}\n", line, sd);
+            lprintf("{server}received path %s from client message(sd){%d}\n", path, sd);
             break;
+        }
         case NME_MSG_CLI:
             break;
         default:

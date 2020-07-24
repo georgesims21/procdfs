@@ -181,11 +181,8 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
     int fd;
     int res;
     char buffer[MAX] = {0};
-    char s[4096] = {0};
+    char s[MAX] = {0};
     const char *fp = final_path(path);
-//    size_t path_len = strlen(fp);
-//    strncpy(s, fp, path_len);
-
 
     if(fi == NULL)
         fd = openat(AT_FDCWD, fp, O_RDONLY);
@@ -202,11 +199,10 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
     if(fi == NULL)
         close(fd);
 
-//    strncat(s, buffer, strlen(buffer));
-
     prepend_content(buffer, s);
     prepend_path(fp, s);
     prepend_flag(CNT_MSG_CLI, s);
+    s[MAX - 1] = '\0'; // for safety
 
     lprintf("{client}sending to server: %s\n", s);
     write(server_sock, s, strlen(s));
