@@ -206,17 +206,14 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
 
     if(fi == NULL)
         close(fd);
-
-    prepend_content(buffer, s);
-    prepend_path(fp, s);
     prepend_flag(NME_MSG_CLI, s);
-    s[MAX - 1] = '\0'; // for safety
+    append_path(fp, s, 1);
+    append_content(buffer, s, MAX_PATH);
 
-//    lprintf("{client}sending to server: %s\n", s);
     write(server_sock, s, strlen(s));
     read(pipecomms[0], &reply, sizeof(reply)); // wait for the final file from reader process
 
-    snprintf(buf, strlen(s), "%s", reply);
+    snprintf(buf, strlen(reply), "%s", reply);
     return res;
 }
 

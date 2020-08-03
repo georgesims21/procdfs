@@ -13,22 +13,24 @@ void prepend_flag(int flag, char *buf) {
     char tmp = flag + '0';
     size_t len = sizeof(tmp);
     memmove(buf + len, buf, strlen(buf) + 1);
-    *buf = tmp; // feels dirtier than mmove but works
+    buf[0] = tmp; // feels dirtier than mmove but works
 }
 
-void prepend_path(const char *path, char *buf) {
+void append_path(const char *path, char *buf, int padding) {
 
     size_t len = strlen(path);
-    memmove(buf + MAX_PATH, buf, strlen(buf) + 1);
-    memcpy(buf, path, len);
+    snprintf(&buf[padding], len + 1, "%s", path);
+//    memmove(buf + MAX_PATH, buf, strlen(buf) + 1);
+//    memcpy(buf, path, len);
 //    *buf = path; // feels dirtier than mmove but works
 }
 
-void prepend_content(char *content, char *buf) {
+void append_content(char *content, char *buf, int padding) {
 
     size_t len = strlen(content);
-    memmove(buf + MAX_PATH + MAX_FLAG, buf, strlen(buf) + 1);
-    memcpy(buf, content, len);
+    snprintf(&buf[padding], len + 1, "%s", content);
+//    memmove(buf + MAX_PATH + MAX_FLAG, buf, strlen(buf) + 1);
+//    memcpy(buf, content, len);
 }
 
 
