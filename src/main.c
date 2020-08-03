@@ -36,8 +36,9 @@
 #include "writer.h"
 #include "log.h"
 
-jmp_buf readjmpbuf;
 int server_sock;
+int CLIENT_FLAG;
+int pipecomms[2];
 
 /*
  * TODO
@@ -70,14 +71,17 @@ static void *procsys_init(struct fuse_conn_info *conn,
     // init client
     server_sock = init_client(&server_addr);
     int pid;
+    pipe(pipecomms);
     if((pid = fork()) < 0) {
         // error
         perror("fork");
         exit(EXIT_FAILURE);
     } else if (pid == 0) {
         // child
+        close(pipecomms[0]); // reader process only needs to write to parent
         read_loop(server_sock);
     }
+    close(pipecomms[1]); // parent only needs to listen to the reader process
 
     return NULL;
 }
@@ -179,10 +183,13 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
      *  [ ] good memory management (calloc and realloc)
      */
 
+    lprintf("{fuse} READ\n");
+
     int fd;
     int res;
     char buffer[MAX] = {0};
     char s[MAX] = {0};
+    char reply[MAX] = {0};
     const char *fp = final_path(path);
 
     if(fi == NULL)
@@ -207,13 +214,9 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
 
 //    lprintf("{client}sending to server: %s\n", s);
     write(server_sock, s, strlen(s));
+    read(pipecomms[0], &reply, sizeof(reply)); // wait for the final file from reader process
 
-    // setjmp
-    int r = -1;
-//    if ((r = setjmp(readjmpbuf)) == 0)
-//        wait(pid);
-
-    snprintf(buf, strlen(s), "%s", s);
+    snprintf(buf, strlen(s), "%s", reply);
     return res;
 }
 

@@ -8,6 +8,7 @@
 
 struct sockaddr_in server_addr;
 QUEUE *queue;
+//int CLIENT_FLAG;
 
 /*
  * TODO
@@ -19,7 +20,10 @@ QUEUE *queue;
  *  * reader
  *  - [x] make parse flag method - returns file path(share in reader api)
  *  - [x] make method to fetch file content into buf
- *  - [ ] longjmp() back to the client FS
+ *  - [x] create a pipe to the reader process
+ *  - [x] force the fs to block on a read call to the pipe, if data then it's the final message
+ *      - Is this method safe? i.e think about if the fs needs to read twice or in multithreaded mode
+ *  - [ ] make sure all buffers are memset correctly after each read etc, getting junk on some
  *  * main
  *  - [ ] take final buf and return it to the (read()) method
  */
@@ -65,13 +69,6 @@ void write_loop(int sock) {
 
 
 void read_loop(int sock) {
-    /*
-     * TODO
-     *  [ ] in the switch, handle incoming server [messages]
-     *      - find the file requested
-     *      - problem is: need to stay in fs operations so we can print BUT also need a constant
-     *      loop reading from the server in case other fs' need a file at any time
-     */
 
     int n;
     char ans[MAX] = {0};
@@ -89,10 +86,6 @@ void read_loop(int sock) {
                 lprintf("{client}[connection message] %s\n", ans);
                 break;
             case REQ_MSG_SER:
-                /*
-                 * TODO
-                 *  [ ] prepend CNT_MSG_CLI to message content buffer before sending
-                 */
                 lprintf("{client}[file request]for path: \"%s\"\n", ans);
                 // from here content of the file is fetched and sent to the server
                 int fd = -1, res = 0, offset = 0, size = 0;
@@ -117,6 +110,7 @@ void read_loop(int sock) {
                 break;
             case FIN_MSG_SER:
                 lprintf("{client}[final content received] %s\n", ans);
+                write(pipecomms[1], ans, sizeof(ans));
                 // from here content of the buffer is handled by the fs and sent to the user
                 break;
             default:
