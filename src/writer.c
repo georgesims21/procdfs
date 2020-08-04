@@ -1,6 +1,6 @@
 #include "writer.h"
-#include "client.h"
 #include "client-server.h"
+#include "defs.h"
 
 /*
  * TODO
@@ -22,17 +22,12 @@ void append_path(const char *path, char *buf, int padding) {
 
     size_t len = strlen(path);
     snprintf(&buf[padding], len + 1, "%s", path);
-//    memmove(buf + MAX_PATH, buf, strlen(buf) + 1);
-//    memcpy(buf, path, len);
-//    *buf = path; // feels dirtier than mmove but works
 }
 
 void append_content(char *content, char *buf, int padding) {
 
     size_t len = strlen(content);
     snprintf(&buf[padding], len + 1, "%s", content);
-//    memmove(buf + MAX_PATH + MAX_FLAG, buf, strlen(buf) + 1);
-//    memcpy(buf, content, len);
 }
 
 void fetch_from_server(char *filebuf, const char *fp, char *buf, int flag, int serversock, int pipe) {

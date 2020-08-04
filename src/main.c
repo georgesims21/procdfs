@@ -34,7 +34,7 @@
 #include "client-server.h"
 #include "client.h"
 #include "writer.h"
-#include "log.h"
+#include "defs.h"
 
 int server_sock;
 int CLIENT_FLAG;
@@ -45,8 +45,6 @@ int pipecomms[2];
  *  * main
  *  - [ ] error checking to see if read op actually read all of the file
  *  - [x] prepend the path to the file content
- *  - [ ] setjmp
- *  - [ ] send data to writer
  *  - [ ] remove the process number
  */
 
@@ -132,7 +130,6 @@ static int procsys_readlink(const char *path, char *buf, size_t size) {
     return 0;
 }
 
-
 static int procsys_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                        off_t offset, struct fuse_file_info *fi,
                        enum fuse_readdir_flags flags) {
@@ -164,9 +161,12 @@ static int procsys_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 static int procsys_open(const char *path, struct fuse_file_info *fi) {
     /*
      * TODO
-     *  [ ] Making this work with the new files
+     *  [?] Making this work with the new files -- check if procsys_read() is called during this op,
+     *      if yes then ignore to-do
      *      - [ ] Must request the file from the server and return the pointer to this
-     *          - [ ] Make a method out of the process in read() to update the file to congregated one
+     *          - [x] Make a method out of the process in read() to update the file to congregated one
+     *          - [ ] Try using procsys_read() before opening
+     *          - [ ] Make a new flag where the file content isn't sent with the flag&path
      */
 
     int res;
@@ -174,8 +174,6 @@ static int procsys_open(const char *path, struct fuse_file_info *fi) {
     res = openat(AT_FDCWD, fpth, O_RDONLY);
     if (res == -1)
         return -errno;
-
-    printf("\n\n path: %s\nfpath: %s\n\n", path, fpth);
 
     fi->fh = res;
     return 0;
@@ -192,8 +190,6 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
     int fd;
     int res;
     char buffer[MAX] = {0};
-    char s[MAX] = {0};
-    char reply[MAX] = {0};
     const char *fp = final_path(path);
 
     if(fi == NULL)

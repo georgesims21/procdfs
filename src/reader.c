@@ -1,8 +1,7 @@
 #include <string.h>
-#include <stdlib.h>
 #include <ctype.h>
 #include "reader.h"
-#include "writer.h"
+#include "defs.h"
 
 int parse_flag(char *buf) {
     // ASCII magic: https://stackoverflow.com/questions/5029840/convert-char-to-int-in-c-and-c

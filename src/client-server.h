@@ -12,9 +12,7 @@
 
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "EndlessLoop"
-#define MAX 4096
-#define READ_MAX (MAX-2)
-#define TERM_CHAR_MAX (MAX-1)
+
 
 
 #define SERVER_HOST "localhost"

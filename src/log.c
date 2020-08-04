@@ -1,8 +1,10 @@
 #include "log.h"
+#include "defs.h"
 #include <stdio.h>
 #include <unistd.h>
 #include <stdarg.h>
 #include <time.h>
+
 //void pprintf(char *message) {
 //    FILE *fp;
 //    chdir("/home/george/github/procsys");

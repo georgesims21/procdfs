@@ -5,10 +5,10 @@
 #include "reader.h"
 #include "writer.h"
 #include "queue.h"
+#include "defs.h"
 
 struct sockaddr_in server_addr;
 QUEUE *queue;
-//int CLIENT_FLAG;
 
 /*
  * TODO
@@ -31,18 +31,18 @@ QUEUE *queue;
 int init_client(struct sockaddr_in *server_add) {
     int sock, r;
 
-    lprintf("{client}Creating TCP stream socket\n");
+    lprintf("{client %d}Creating TCP stream socket\n", getpid());
     if((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("socket\n");
         exit(1);
     }
 
-    lprintf("{client}filling sockaddr struct\n");
+    lprintf("{client %d}filling sockaddr struct\n", getpid());
     server_add->sin_family = AF_INET;
     server_add->sin_port = htons(SERVER_PORT); // htons converts int to network byte order
     server_add->sin_addr.s_addr = htonl(INADDR_ANY);
 
-    lprintf("{client}Binding socket to server address\n");
+    lprintf("{client %d}Binding socket to server address\n", getpid());
     if((r = connect(sock, (struct sockaddr*)server_add, sizeof(*server_add))) < 0) {
         perror("connect");
         exit(1);
@@ -78,15 +78,15 @@ void read_loop(int sock) {
             perror("read");
             exit(1);
         } else if(n == 0) {
-            lprintf("{client}Server disconnected.. exiting\n");
+            lprintf("{client %d}Server disconnected.. exiting\n", getpid());
             exit(1);
         }
         switch(parse_flag(ans)) {
             case CONN_MSG_SER:
-                lprintf("{client}[connection message] %s\n", ans);
+                lprintf("{client %d}[connection message] %s\n", getpid(), ans);
                 break;
             case REQ_MSG_SER:
-                lprintf("{client}[file request]for path: \"%s\"\n", ans);
+                lprintf("{client %d}[file request]for path: \"%s\"\n", getpid(), ans);
                 // from here content of the file is fetched and sent to the server
                 int fd = -1, res = 0, offset = 0, size = 0;
                 char buf[4096] = {0};
@@ -109,12 +109,12 @@ void read_loop(int sock) {
                 }
                 break;
             case FIN_MSG_SER:
-                lprintf("{client}[final content received] %s\n", ans);
+                lprintf("{client %d}[final content received] %s\n", getpid(), ans);
                 write(pipecomms[1], ans, sizeof(ans));
                 // from here content of the buffer is handled by the fs and sent to the user
                 break;
             default:
-                lprintf("{client}[other] %s\n", ans);
+                lprintf("{client %d}[other] %s\n", getpid(), ans);
                 break;
         }
         memset(ans, 0, sizeof(ans));

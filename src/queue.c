@@ -1,4 +1,5 @@
 #include "queue.h"
+#include "defs.h"
 
 int enqueue(QUEUE **queue, BUFELEM *bufelem) {
 /*

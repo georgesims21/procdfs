@@ -1,4 +1,5 @@
 #include "fileops.h"
+#include "defs.h"
 
 int file_exists(const char *pathname) {
     int fd;
@@ -105,6 +106,16 @@ const char *final_path(const char *path) {
     char *final_path = malloc(len + 1);
     snprintf(final_path, len + 1, "%s%s", proc, path);
     return final_path;
+}
+
+char *remove_pid(char *buf) {
+
+    /*
+     * TODO
+     *  - [ ] remove the first digits and '/' up until the second '/' to remove PID nr
+     *  - [ ] now try with 3 machines
+     *  - [ ] congregate some files like /net/dev to test
+     */
 }
 
 
