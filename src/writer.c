@@ -1,4 +1,6 @@
 #include "writer.h"
+#include "client.h"
+#include "client-server.h"
 
 /*
  * TODO
@@ -31,6 +33,20 @@ void append_content(char *content, char *buf, int padding) {
     snprintf(&buf[padding], len + 1, "%s", content);
 //    memmove(buf + MAX_PATH + MAX_FLAG, buf, strlen(buf) + 1);
 //    memcpy(buf, content, len);
+}
+
+void fetch_from_server(char *filebuf, const char *fp, char *buf, int flag, int serversock, int pipe) {
+    char tmpbuf[MAX] = {0};
+    char reply[MAX] = {0};
+
+    prepend_flag(flag, tmpbuf);
+    append_path(fp, tmpbuf, 1);
+    append_content(filebuf, tmpbuf, MAX_PATH);
+
+    write(serversock, tmpbuf, strlen(tmpbuf));
+    read(pipe, &reply, sizeof(reply)); // wait for the final file from reader process
+
+    snprintf(buf, strlen(reply), "%s", reply);
 }
 
 

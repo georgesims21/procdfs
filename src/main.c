@@ -162,6 +162,12 @@ static int procsys_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 }
 
 static int procsys_open(const char *path, struct fuse_file_info *fi) {
+    /*
+     * TODO
+     *  [ ] Making this work with the new files
+     *      - [ ] Must request the file from the server and return the pointer to this
+     *          - [ ] Make a method out of the process in read() to update the file to congregated one
+     */
 
     int res;
     const char *fpth = final_path(path);
@@ -182,8 +188,6 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
      *  [ ] remove pid number from the path when 1< connected
      *  [ ] good memory management (calloc and realloc)
      */
-
-    lprintf("{fuse} READ\n");
 
     int fd;
     int res;
@@ -206,14 +210,8 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
 
     if(fi == NULL)
         close(fd);
-    prepend_flag(NME_MSG_CLI, s);
-    append_path(fp, s, 1);
-    append_content(buffer, s, MAX_PATH);
 
-    write(server_sock, s, strlen(s));
-    read(pipecomms[0], &reply, sizeof(reply)); // wait for the final file from reader process
-
-    snprintf(buf, strlen(reply), "%s", reply);
+    fetch_from_server(buffer, fp, buf, NME_MSG_CLI, server_sock, pipecomms[0]);
     return res;
 }
 
