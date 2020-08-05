@@ -16,7 +16,8 @@ void remove_pid(char *buf) {
 
     int pid = getpid();
     size_t pidlen = numPlaces(pid) + 1; // account for leading '/'
-    memmove(buf + strlen("/proc"), buf + pidlen + strlen("/proc"), strlen(buf));
+    size_t proclen = strlen("/proc");
+    memmove(buf + proclen, buf + pidlen + proclen, strlen(buf));
 }
 
 int numPlaces (int n) {
