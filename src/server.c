@@ -139,6 +139,7 @@ int handle_client(int socket_set[], int sd, int len, unsigned int i, char *line,
 
     char tmp[MAX] = {0};
     char path[64] = {0};
+    int pid = 0;
     if ((read(sd, line, READ_MAX)) == 0) {
         //Somebody disconnected
         disconnect_sock(socket_set, server_add, sd, len, i);
@@ -149,9 +150,10 @@ int handle_client(int socket_set[], int sd, int len, unsigned int i, char *line,
 
     switch(parse_flag(line)) {
         case NME_MSG_CLI:
+            remove_pid(line);
             parse_path(path, line);
             caller.fd = sd;
-            snprintf(caller.path, 64, "%s", path);
+            snprintf(caller.path, MAX_PATH, "%s", path);
             snprintf(caller.content, MAX, "%s", line);
             lprintf("{server}[file request]for path \"%s\" received from client(sd){%d}\n",
                     caller.path, caller.fd);

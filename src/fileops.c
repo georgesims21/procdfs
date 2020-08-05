@@ -1,5 +1,6 @@
 #include "fileops.h"
 #include "defs.h"
+#include <limits.h>
 
 int file_exists(const char *pathname) {
     int fd;
@@ -102,22 +103,12 @@ size_t populate(char **buf, size_t size, off_t offset, const char *path) {
 
 const char *final_path(const char *path) {
 
+
     size_t len = strlen(proc) + strlen(path);
     char *final_path = malloc(len + 1);
     snprintf(final_path, len + 1, "%s%s", proc, path);
     return final_path;
 }
-
-char *remove_pid(char *buf) {
-
-    /*
-     * TODO
-     *  - [ ] remove the first digits and '/' up until the second '/' to remove PID nr
-     *  - [ ] now try with 3 machines
-     *  - [ ] congregate some files like /net/dev to test
-     */
-}
-
 
 char **dir_contents(const char *path) {
     // refs: https://faq.cprogramming.com/cgi-bin/smartfaq.cgi?answer=1046380353&id=1044780608

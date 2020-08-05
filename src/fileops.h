@@ -26,5 +26,4 @@ const char *final_path(const char *path);
 char **dir_contents(const char *path);
 int dir_size(const char *path);
 int parse_message(char *message);
-
 #endif //PROCSYS_FILEOPS_H
