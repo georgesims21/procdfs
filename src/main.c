@@ -68,6 +68,7 @@ static void *procsys_init(struct fuse_conn_info *conn,
     cfg->attr_timeout = 0;
     cfg->negative_timeout = 0;
 
+    // if address is already in use then don't run a server
     if((server_socket = init_server(10, &server_addr)) > -1) {
         int pid;
         if((pid = fork()) < 0) {
@@ -79,8 +80,6 @@ static void *procsys_init(struct fuse_conn_info *conn,
             server_loop(server_socket, sizeof(server_addr), &server_addr);
         }
     }
-
-    sleep(2);
 
     // init client
     client_socket = init_client(&server_addr);
@@ -94,7 +93,6 @@ static void *procsys_init(struct fuse_conn_info *conn,
         // child
         close(pipecomms[0]); // reader process only needs to write to parent
         read_loop(client_socket, pipecomms[1]);
-
     }
     close(pipecomms[1]); // parent only needs to listen to the reader process
 
