@@ -8,7 +8,7 @@
 #include "defs.h"
 
 QUEUE *queue;
-
+int my_fd;
 /*
  * TODO
  *  * writer
@@ -72,15 +72,16 @@ void read_loop(int sock, int pipe) {
             perror("read");
             exit(1);
         } else if(n == 0) {
-            lprintf("{client %d}Server disconnected.. exiting\n", getpid());
+            lprintf("{client %d}Server disconnected.. exiting\n", my_fd);
             exit(1);
         }
         switch(parse_flag(ans)) {
             case CONN_MSG_SER:
-                lprintf("{client %d}[connection message] %s\n", getpid(), ans);
+                my_fd = parse_flag(ans);
+                lprintf("{client %d}[connection message] %s\n", my_fd, ans);
                 break;
             case REQ_MSG_SER:
-                lprintf("{client %d}[file request]for path: \"%s\"\n", getpid(), ans);
+                lprintf("{client %d}[file request]for path: \"%s\"\n", my_fd, ans);
                 // from here content of the file is fetched and sent to the server
                 int fd = -1, res = 0, offset = 0, size = 0;
                 char buf[4096] = {0};
@@ -103,12 +104,12 @@ void read_loop(int sock, int pipe) {
                 }
                 break;
             case FIN_MSG_SER:
-                lprintf("{client %d}[final content received] %s\n", getpid(), ans);
+                lprintf("{client %d}[final content received] %s\n", my_fd, ans);
                 write(pipe, ans, sizeof(ans));
                 // from here content of the buffer is handled by the fs and sent to the user
                 break;
             default:
-                lprintf("{client %d}[other] %s\n", getpid(), ans);
+                lprintf("{client %d}[other] %s\n", my_fd, ans);
                 break;
         }
         memset(ans, 0, sizeof(ans));

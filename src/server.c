@@ -121,15 +121,20 @@ int listenfds(int socket_set[], int server_socket, fd_set *fds, int sd) {
     return maxsd;
 }
 
-void accept_connection(int socket_set[], int server_socket, int new_sock, int len, char *message,
+void accept_connection(int socket_set[], int server_socket, int new_sock, int len,
         struct sockaddr_in *server_add) {
+
+    char message[MAX] = {0};
     if ((new_sock = accept(server_socket,
                            (struct sockaddr *)server_add, (socklen_t *)&len)) < 0) {
         perror("accept");
         exit(EXIT_FAILURE);
     }
-    lprintf("{server %d}New connection , socket fd is %d , ip is : %s , port : %d\n", getpid(),
+    lprintf("{server %d}New connection , socket fd is %d , ip is : %s , port : %d\n",  getpid(),
             new_sock, inet_ntoa(server_add->sin_addr), ntohs(server_add->sin_port));
+
+    sprintf(message, "%d%dConnected to server address at %s and port %hu...", CONN_MSG_SER, new_sock,
+            inet_ntoa(server_add->sin_addr) , ntohs(server_add->sin_port));
 
     if(send(new_sock, message, strlen(message), 0) != strlen(message)) {
         perror("send");
@@ -180,17 +185,13 @@ void server_loop(int server_socket, int len, struct sockaddr_in *server_addr) {
     int client_socks[MAX_CLIENTS] = {0}, new_sock = 0, sd = 0, maxsd = 0;
     unsigned int i = 0;
     char line[MAX] = {0};
-    char message[MAX] = {0};
     fd_set fdset;
-
-    sprintf(message, "%dConnected to server address at %s and port %hu...", CONN_MSG_SER,
-            inet_ntoa(server_addr->sin_addr) , ntohs(server_addr->sin_port));
 
     while(1) { // for accepting connections
         maxsd = listenfds(client_socks, server_socket, &fdset, sd);
         //If something happened on the master socket, then its an incoming connection
         if (FD_ISSET(server_socket, &fdset)) {
-            accept_connection(client_socks, server_socket, new_sock, len, message, server_addr);
+            accept_connection(client_socks, server_socket, new_sock, len, server_addr);
         }
         //else its some IO operation on some other socket
         for (i = 0; i < MAX_CLIENTS; i++) {
