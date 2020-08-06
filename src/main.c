@@ -33,6 +33,7 @@
 #include "fileops.h"
 #include "client-server.h"
 #include "client.h"
+#include "server.h"
 #include "writer.h"
 #include "defs.h"
 
@@ -52,6 +53,7 @@ static void *procsys_init(struct fuse_conn_info *conn,
 
     (void) conn;
     struct sockaddr_in server_addr;
+    int server_socket;
     sleep(2); // to allow for server to start on run config
     cfg->use_ino = 1;
 
@@ -65,6 +67,20 @@ static void *procsys_init(struct fuse_conn_info *conn,
     cfg->entry_timeout = 0;
     cfg->attr_timeout = 0;
     cfg->negative_timeout = 0;
+
+    if((server_socket = init_server(10, &server_addr)) > -1) {
+        int pid;
+        if((pid = fork()) < 0) {
+            // error
+            perror("fork");
+            exit(EXIT_FAILURE);
+        } else if (pid == 0) {
+            // child
+            server_loop(server_socket, sizeof(server_addr), &server_addr);
+        }
+    }
+
+    sleep(2);
 
     // init client
     client_socket = init_client(&server_addr);

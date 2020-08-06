@@ -20,12 +20,11 @@
  *      - [ ] make list of files containing static information - don't congregate the rest yes?
  */
 
-struct sockaddr_in server_addr;
-int server_sock;
 CALLER caller = {0};
 
 int init_server(int queue_len, struct sockaddr_in *server_add) {
-    int opt = 1, socket_fd;
+    int opt = 1, socket_fd, r;
+    struct sockaddr_in *tmp = {0};
 
     timestamp_log("server");
 
@@ -47,8 +46,13 @@ int init_server(int queue_len, struct sockaddr_in *server_add) {
 
     lprintf("{server}Binding socket to server address\n");
     if(bind(socket_fd, (struct sockaddr*)server_add, sizeof(*server_add)) < 0) {
-        perror("bind");
-        exit(EXIT_FAILURE);
+        if (errno == EADDRINUSE) {
+            lprintf("{server %d}port already in use, returning...\n", getpid());
+            return -1;
+        } else {
+            perror("bind");
+            exit(EXIT_FAILURE);
+        }
     }
 
     lprintf("{server}server is listening on port: %d\n", SERVER_PORT);
@@ -172,24 +176,28 @@ int handle_client(int socket_set[], int sd, int len, unsigned int i, char *line,
     return 0;
 }
 
-void server_loop(int server_socket, int len, char *message) {
+void server_loop(int server_socket, int len, struct sockaddr_in *server_addr) {
     int client_socks[MAX_CLIENTS] = {0}, new_sock = 0, sd = 0, maxsd = 0;
     unsigned int i = 0;
     char line[MAX] = {0};
+    char message[MAX] = {0};
     fd_set fdset;
+
+    sprintf(message, "%dConnected to server address at %s and port %hu...", CONN_MSG_SER,
+            inet_ntoa(server_addr->sin_addr) , ntohs(server_addr->sin_port));
 
     while(1) { // for accepting connections
         maxsd = listenfds(client_socks, server_socket, &fdset, sd);
         //If something happened on the master socket, then its an incoming connection
         if (FD_ISSET(server_socket, &fdset)) {
-            accept_connection(client_socks, server_socket, new_sock, len, message, &server_addr);
+            accept_connection(client_socks, server_socket, new_sock, len, message, server_addr);
         }
         //else its some IO operation on some other socket
         for (i = 0; i < MAX_CLIENTS; i++) {
             sd = client_socks[i];
             if (FD_ISSET(sd , &fdset)) {
                 //Check if it was for closing , and also read the incoming message
-                switch (handle_client(client_socks, sd, len, i, line, &server_addr)) {
+                switch (handle_client(client_socks, sd, len, i, line, server_addr)) {
                     case CLI_DISCONNECT:
                         break;
                     case CLI_SKIP_CALLER:
@@ -212,21 +220,19 @@ void server_loop(int server_socket, int len, char *message) {
         }
     }
 }
-
-void run_server(void) {
-    int len = 0;
-    char message[MAX] = {0};
-
-    server_sock = init_server(10, &server_addr);
-    len = sizeof(server_addr);
-    sprintf(message, "%dConnected to server address at %s and port %hu...", CONN_MSG_SER,
-            inet_ntoa(server_addr.sin_addr) , ntohs(server_addr.sin_port));
-
-    server_loop(server_sock, len, message);
-}
-
-int main(int argc, char *argv[]) {
-    run_server();
-    return 0;
-}
+//
+//void run_server(void) {
+//    int len = 0;
+//
+//    server_sock = init_server(10, &server_addr);
+//    len = sizeof(server_addr);
+//
+//
+//    server_loop(server_sock, len, message);
+//}
+//
+//int main(int argc, char *argv[]) {
+//    run_server();
+//    return 0;
+//}
 

@@ -16,7 +16,7 @@ int listenfds(int socket_set[], int server_sock, fd_set *fds, int sd);
 void accept_connection(int socket_set[], int server_sock, int new_sock, int len, char *message,
                        struct sockaddr_in *server_add);
 int handle_client(int socket_set[], int sd, int len, unsigned int i, char *line, struct sockaddr_in *server_add);
-void server_loop(int server_sock, int len, char *message);
+void server_loop(int server_sock, int len, struct sockaddr_in *server_addr);
 void run_server(void);
 
 typedef struct caller {
