@@ -2,30 +2,29 @@
 #include "server.h"
 #include "log.h"
 #include "fileops.h"
+#include "reader.h"
+#include "writer.h"
+#include "defs.h"
 
 /*
  * TODO
  *  * writer
- *  - [ ] create buf containing file path
- *  - [ ] prepend flag to buf (from writer api)
  *  * reader
- *  - [ ] parse flag method (from reader api)
- *  - [ ] parse path method
- *  - [ ] parse content method
  *  * main
  *  - [ ] maxsd isn't used after is is assigned
  *  - [ ] send buf to all clients, skip fd of caller
- *  - [ ] struct containing calling clients fd with flag, path and content
+ *  - [x] struct containing calling clients fd with flag, path and content
  *  - [ ] queue data struct to hold received buffers
  *      - queue empty method: keep queue length as global and constantly check in while loop
  *  - [ ] method to congregate values from all the buffers
+ *      - [ ] make list of files containing static information - don't congregate the rest yes?
  */
 
-struct sockaddr_in server_addr;
-int server_sock;
+CALLER caller = {0};
 
 int init_server(int queue_len, struct sockaddr_in *server_add) {
-    int opt = 1, socket_fd;
+    int opt = 1, socket_fd, r;
+    struct sockaddr_in *tmp = {0};
 
     timestamp_log("server");
 
@@ -47,8 +46,13 @@ int init_server(int queue_len, struct sockaddr_in *server_add) {
 
     lprintf("{server}Binding socket to server address\n");
     if(bind(socket_fd, (struct sockaddr*)server_add, sizeof(*server_add)) < 0) {
-        perror("bind");
-        exit(EXIT_FAILURE);
+        if (errno == EADDRINUSE) {
+            lprintf("{server %d}port already in use, returning...\n", getpid());
+            return -1;
+        } else {
+            perror("bind");
+            exit(EXIT_FAILURE);
+        }
     }
 
     lprintf("{server}server is listening on port: %d\n", SERVER_PORT);
@@ -99,9 +103,8 @@ void disconnect_sock(int socket_set[], struct sockaddr_in *server_add, int sd, i
 
 void notify_clients(int socket_set[], int sd, char *line) {
     for(unsigned int j = 0; j < MAX_CLIENTS; j++) {
-//        if(sd == socket_set[j])
-//            continue;
-        send(socket_set[j], line, strlen(line), 0);
+        if(sd == socket_set[j])
+            send(socket_set[j], line, strlen(line), 0);
     }
 }
 
@@ -136,78 +139,100 @@ void accept_connection(int socket_set[], int server_socket, int new_sock, int le
         lprintf("{server}socket fd array full!");
 }
 
-char handle_client(int socket_set[], int sd, int len, int i, char *line, struct sockaddr_in *server_add) {
-    /*
-     * TODO
-     *  - [ ] do the switch statement with the same logic as client
-     *      - prepend correct flags to each messgae: use memmove and memcpy https://stackoverflow.com/questions/2328182/prepending-to-a-string
-     *      - Check if read adds terminating char
-     */
+int handle_client(int socket_set[], int sd, int len, unsigned int i, char *line, struct sockaddr_in *server_add) {
+
     char tmp[MAX] = {0};
+    char path[64] = {0};
+    int pid = 0;
     if ((read(sd, line, READ_MAX)) == 0) {
         //Somebody disconnected
         disconnect_sock(socket_set, server_add, sd, len, i);
-        return 1;
+        return CLI_DISCONNECT;
     }
     // Client message
     line[TERM_CHAR_MAX] = '\0';
 
-    switch(parse_message(line)) {
-        case CNT_MSG_CLI:
-            lprintf("{server}received message %s from client(sd){%d}\n", line, sd);
-            break;
+    switch(parse_flag(line)) {
         case NME_MSG_CLI:
-            break;
+            remove_pid(line);
+            parse_path(path, line);
+            caller.fd = sd;
+            snprintf(caller.path, MAX_PATH, "%s", path);
+            snprintf(caller.content, MAX, "%s", line);
+            lprintf("{server}[file request]for path \"%s\" received from client(sd){%d}\n",
+                    caller.path, caller.fd);
+            snprintf(line, strlen(path) + 1, "%s", path);
+            prepend_flag(REQ_MSG_SER, line);
+            return CLI_SKIP_CALLER;
+        case CNT_MSG_CLI:
+            lprintf("{server}[file content]for path \"%s\" received from client(sd){%d}\n",
+                    caller.path, sd);
+            // could we add to queue here?
+            prepend_flag(FIN_MSG_SER, line);
+            return CLI_SEND_CALLER;
         default:
             break;
     }
-
-    sprintf(tmp, "%d%s", REQ_MSG_SER, line);
-    sprintf(line, "%s", tmp);
     return 0;
 }
 
-void server_loop(int server_socket, int len, char *message) {
+void server_loop(int server_socket, int len, struct sockaddr_in *server_addr) {
     int client_socks[MAX_CLIENTS] = {0}, new_sock = 0, sd = 0, maxsd = 0;
     unsigned int i = 0;
     char line[MAX] = {0};
+    char message[MAX] = {0};
     fd_set fdset;
+
+    sprintf(message, "%dConnected to server address at %s and port %hu...", CONN_MSG_SER,
+            inet_ntoa(server_addr->sin_addr) , ntohs(server_addr->sin_port));
 
     while(1) { // for accepting connections
         maxsd = listenfds(client_socks, server_socket, &fdset, sd);
         //If something happened on the master socket, then its an incoming connection
         if (FD_ISSET(server_socket, &fdset)) {
-            accept_connection(client_socks, server_socket, new_sock, len, message, &server_addr);
+            accept_connection(client_socks, server_socket, new_sock, len, message, server_addr);
         }
         //else its some IO operation on some other socket
         for (i = 0; i < MAX_CLIENTS; i++) {
             sd = client_socks[i];
             if (FD_ISSET(sd , &fdset)) {
                 //Check if it was for closing , and also read the incoming message
-                if(handle_client(client_socks, sd, len, i, line, &server_addr) == 0) {
-                    // notify all other connected clients about message
-                    notify_clients(client_socks, sd, line);
-                    memset(line, 0, sizeof(line));
+                switch (handle_client(client_socks, sd, len, i, line, server_addr)) {
+                    case CLI_DISCONNECT:
+                        break;
+                    case CLI_SKIP_CALLER:
+                        // requesting the file from all clients but the caller
+                        for(unsigned int j = 0; j < MAX_CLIENTS; j++) {
+                            if(caller.fd == client_socks[j])
+                                continue;
+                            send(client_socks[j], line, strlen(line), 0);
+                        }
+                        break;
+                    case CLI_SEND_CALLER:
+                        // send final file to caller
+                        send(caller.fd, line, strlen(line), 0);
+                        break;
+                    default:
+                        break;
                 }
+                memset(line, 0, sizeof(line));
             }
         }
     }
 }
-
-void run_server(void) {
-    int len = 0;
-    char message[MAX] = {0};
-
-    server_sock = init_server(10, &server_addr);
-    len = sizeof(server_addr);
-    sprintf(message, "%dConnected to server address at %s and port %hu...", CONN_MSG_SER,
-            inet_ntoa(server_addr.sin_addr) , ntohs(server_addr.sin_port));
-
-    server_loop(server_sock, len, message);
-}
-
-int main(int argc, char *argv[]) {
-    run_server();
-    return 0;
-}
+//
+//void run_server(void) {
+//    int len = 0;
+//
+//    server_sock = init_server(10, &server_addr);
+//    len = sizeof(server_addr);
+//
+//
+//    server_loop(server_sock, len, message);
+//}
+//
+//int main(int argc, char *argv[]) {
+//    run_server();
+//    return 0;
+//}
 

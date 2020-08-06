@@ -1,15 +1,19 @@
 #ifndef PROCSYS_QUEUE_H
 #define PROCSYS_QUEUE_H
 
-#include "tree.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 typedef struct queue {
     struct queue *next;
-    struct node *node;
-} QUEUE;
+    struct bufelem *node;
+}QUEUE;
+
+typedef struct bufelem {
+    char *buf;
+    int complete;
+}BUFELEM;
 
 
 /* Enqueue a NODE into the queue
@@ -17,13 +21,13 @@ typedef struct queue {
  * 0 upon success
  * -1 upen failiure
  */
-int enqueue(QUEUE **queue, NODE *node);
+int enqueue(QUEUE **queue, BUFELEM *bufelem);
 
 /* Dequeue a NODE from the queue
  * @return
  * NODE located at front of the queue
  */
-NODE *dequeue(QUEUE **queue);
+BUFELEM *dequeue(QUEUE **queue);
 
 /* Print queue contents */
 void printq(QUEUE **queue);

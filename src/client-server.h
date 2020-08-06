@@ -12,18 +12,11 @@
 
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "EndlessLoop"
-#define MAX 256
-#define READ_MAX (MAX-2)
-#define TERM_CHAR_MAX (MAX-1)
-
 
 #define SERVER_HOST "localhost"
 #define SERVER_IP "127.0.0.1"
 #define SERVER_PORT 1234
 #define SIZEOF_INT sizeof(int)
-
-extern struct sockaddr_in server_addr;
-extern int server_sock;
 
 // server->client comms flags
 #define CONN_MSG_SER    1 // initial connection message

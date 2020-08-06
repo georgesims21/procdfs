@@ -5,7 +5,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define MAXPATH 64
 
 typedef struct node {
     struct node *parent, *child, *sibling;

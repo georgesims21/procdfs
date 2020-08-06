@@ -10,10 +10,6 @@
 #include <sys/stat.h>
 #include <dirent.h>
 
-#define BUFSIZE 4096
-#define MAXPATH 64
-
-static const char *pndpath = "/proc/net/dev";
 static char proc[] = "/proc";
 
 int file_exists(const char *pathname);
@@ -30,5 +26,4 @@ const char *final_path(const char *path);
 char **dir_contents(const char *path);
 int dir_size(const char *path);
 int parse_message(char *message);
-
 #endif //PROCSYS_FILEOPS_H

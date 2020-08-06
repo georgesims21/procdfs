@@ -1,4 +1,6 @@
 #include "fileops.h"
+#include "defs.h"
+#include <limits.h>
 
 int file_exists(const char *pathname) {
     int fd;
@@ -101,12 +103,12 @@ size_t populate(char **buf, size_t size, off_t offset, const char *path) {
 
 const char *final_path(const char *path) {
 
+
     size_t len = strlen(proc) + strlen(path);
     char *final_path = malloc(len + 1);
     snprintf(final_path, len + 1, "%s%s", proc, path);
     return final_path;
 }
-
 
 char **dir_contents(const char *path) {
     // refs: https://faq.cprogramming.com/cgi-bin/smartfaq.cgi?answer=1046380353&id=1044780608
@@ -155,9 +157,4 @@ int dir_size(const char *path) {
     return i;
 }
 
-int parse_message(char *message) {
-    // ASCII magic: https://stackoverflow.com/questions/5029840/convert-char-to-int-in-c-and-c
-    int flag = message[0] - '0';
-    memmove(message, message + 1, strlen(message));
-    return flag;
-}
+

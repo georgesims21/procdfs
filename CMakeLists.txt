@@ -3,10 +3,58 @@ project(procsys C)
 
 set(CMAKE_C_STANDARD 11)
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/CMakeModules/")
-add_executable(procsys src/main.c src/fileops.c src/fileops.h src/client.c src/client.h src/log.c src/log.h)
-add_executable(testing src/testing.c)
-add_executable(server src/server.c src/client-server.h src/server.h src/log.c src/log.h)
-add_executable(client src/client.c src/client-server.h src/client.h src/log.c src/log.h)
+
+#add_executable(procsys
+#        src/main.c src/fileops.c
+#        src/fileops.h src/client.c
+#        src/client.h src/log.c
+#        src/log.h src/writer.c
+#        src/writer.h src/reader.c
+#        src/reader.h src/queue.h
+#        src/queue.c src/defs.h)
+add_executable(procsys
+        src/main.c src/fileops.c
+        src/fileops.h src/client.c
+        src/client.h src/log.c
+        src/log.h src/writer.c
+        src/writer.h src/reader.c
+        src/reader.h src/queue.h
+        src/queue.c src/defs.h
+        src/server.c src/server.h)
+add_executable(procsys2
+        src/main.c src/fileops.c
+        src/fileops.h src/client.c
+        src/client.h src/log.c
+        src/log.h src/writer.c
+        src/writer.h src/reader.c
+        src/reader.h src/queue.h
+        src/queue.c src/defs.h
+        src/server.c src/server.h)
+#add_executable(procsys2
+#        src/main.c src/fileops.c
+#        src/fileops.h src/client.c
+#        src/client.h src/log.c
+#        src/log.h src/writer.c
+#        src/writer.h src/reader.c
+#        src/reader.h src/queue.h
+#        src/queue.c src/defs.h)
+add_executable(server
+        src/server.c src/client-server.h
+        src/server.h src/log.c
+        src/log.h src/fileops.c
+        src/fileops.h src/reader.c
+        src/reader.h src/writer.c
+        src/writer.h src/defs.h)
+add_executable(client
+        src/client.c src/client-server.h
+        src/client.h src/log.c
+        src/log.h src/fileops.c
+        src/fileops.h src/reader.c
+        src/reader.h src/writer.c
+        src/writer.h src/queue.c
+        src/queue.h src/defs.h)
+add_executable(testing src/testing.c src/testing.h src/testing2.c src/testing2.h src/defs.h)
+
 set(CMAKE_C_FLAGS "-D_FILE_OFFSET_BITS=64 -lfuse3")
 
 #https://github.com/thejinx0r/DriveFS/blob/master/CMakeLists.txt

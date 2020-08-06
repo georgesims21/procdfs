@@ -33,23 +33,28 @@
 #include "fileops.h"
 #include "client-server.h"
 #include "client.h"
-#include "log.h"
+#include "server.h"
+#include "writer.h"
+#include "defs.h"
 
-int server_sock;
+int client_socket;
+int pipecomms[2];
+
 /*
  * TODO
  *  * main
  *  - [ ] error checking to see if read op actually read all of the file
- *  - [ ] prepend the path to the file content
- *       - remove the process number
- *  - [ ] setjmp
- *  - [ ] send data to writer
+ *  - [x] prepend the path to the file content
+ *  - [ ] remove the process number
  */
 
 static void *procsys_init(struct fuse_conn_info *conn,
                       struct fuse_config *cfg) {
 
     (void) conn;
+    struct sockaddr_in server_addr;
+    int server_socket;
+    sleep(2); // to allow for server to start on run config
     cfg->use_ino = 1;
 
     /* Pick up changes from lower filesystem right away. This is
@@ -63,17 +68,35 @@ static void *procsys_init(struct fuse_conn_info *conn,
     cfg->attr_timeout = 0;
     cfg->negative_timeout = 0;
 
+    if((server_socket = init_server(10, &server_addr)) > -1) {
+        int pid;
+        if((pid = fork()) < 0) {
+            // error
+            perror("fork");
+            exit(EXIT_FAILURE);
+        } else if (pid == 0) {
+            // child
+            server_loop(server_socket, sizeof(server_addr), &server_addr);
+        }
+    }
+
+    sleep(2);
+
     // init client
-    server_sock = init_client(&server_addr);
+    client_socket = init_client(&server_addr);
     int pid;
+    pipe(pipecomms);
     if((pid = fork()) < 0) {
         // error
         perror("fork");
         exit(EXIT_FAILURE);
     } else if (pid == 0) {
         // child
-        read_loop(server_sock);
+        close(pipecomms[0]); // reader process only needs to write to parent
+        read_loop(client_socket, pipecomms[1]);
+
     }
+    close(pipecomms[1]); // parent only needs to listen to the reader process
 
     return NULL;
 }
@@ -124,7 +147,6 @@ static int procsys_readlink(const char *path, char *buf, size_t size) {
     return 0;
 }
 
-
 static int procsys_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                        off_t offset, struct fuse_file_info *fi,
                        enum fuse_readdir_flags flags) {
@@ -154,6 +176,15 @@ static int procsys_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 }
 
 static int procsys_open(const char *path, struct fuse_file_info *fi) {
+    /*
+     * TODO
+     *  [?] Making this work with the new files -- check if procsys_read() is called during this op,
+     *      if yes then ignore to-do
+     *      - [ ] Must request the file from the server and return the pointer to this
+     *          - [x] Make a method out of the process in read() to update the file to congregated one
+     *          - [ ] Try using procsys_read() before opening
+     *          - [ ] Make a new flag where the file content isn't sent with the flag&path
+     */
 
     int res;
     const char *fpth = final_path(path);
@@ -161,20 +192,21 @@ static int procsys_open(const char *path, struct fuse_file_info *fi) {
     if (res == -1)
         return -errno;
 
-    printf("\n\n path: %s\nfpath: %s\n\n", path, fpth);
-
     fi->fh = res;
     return 0;
 }
 
 static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
                     struct fuse_file_info *fi) {
-
-
+    /*
+     * TODO
+     *  [ ] remove pid number from the path when 1< connected
+     *  [ ] good memory management (calloc and realloc)
+     */
 
     int fd;
     int res;
-    char line[MAX] = "This is a test";
+    char buffer[MAX] = {0};
     const char *fp = final_path(path);
 
     if(fi == NULL)
@@ -185,12 +217,14 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
     if (fd == -1)
         return -errno;
 
-    res = pread(fd, buf, size, offset);
+    res = pread(fd, buffer, size, offset);
     if (res == -1)
         res = -errno;
 
     if(fi == NULL)
         close(fd);
+
+    fetch_from_server(buffer, fp, buf, NME_MSG_CLI, client_socket, pipecomms[0]);
     return res;
 }
 

@@ -1,7 +1,11 @@
 #ifndef PROCSYS_SERVER_H
 #define PROCSYS_SERVER_H
 
-#define MAX_CLIENTS 10
+#include "defs.h"
+
+#define CLI_DISCONNECT 6
+#define CLI_SKIP_CALLER 7
+#define CLI_SEND_CALLER 8
 
 int init_server(int queue_len, struct sockaddr_in *server_add);
 int add_clients(int socket_set[], int sd, int maxsd, fd_set *newfdset);
@@ -11,8 +15,14 @@ void notify_clients(int socket_set[], int sd, char *line);
 int listenfds(int socket_set[], int server_sock, fd_set *fds, int sd);
 void accept_connection(int socket_set[], int server_sock, int new_sock, int len, char *message,
                        struct sockaddr_in *server_add);
-char handle_client(int socket_set[], int sd, int len, int i, char *line, struct sockaddr_in *server_add);
-void server_loop(int server_sock, int len, char *message);
+int handle_client(int socket_set[], int sd, int len, unsigned int i, char *line, struct sockaddr_in *server_add);
+void server_loop(int server_sock, int len, struct sockaddr_in *server_addr);
 void run_server(void);
+
+typedef struct caller {
+    int fd;
+    char path[MAX_PATH];
+    char content[MAX];
+}CALLER;
 
 #endif //PROCSYS_SERVER_H
