@@ -11,6 +11,6 @@ int parse_message(char *message);
 void lprintf(const char *fmt, ...);
 void read_server(int sock);
 void write_server(char *line, int sock);
-void run_client(void);
+void run_client(struct sockaddr_in *server_add);
 
 #endif //PROCSYS_CLIENT_H

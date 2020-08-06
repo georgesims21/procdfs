@@ -7,7 +7,7 @@
 #include "queue.h"
 #include "defs.h"
 
-struct sockaddr_in server_addr;
+int client_sock;
 QUEUE *queue;
 
 /*
@@ -29,10 +29,10 @@ QUEUE *queue;
  */
 
 int init_client(struct sockaddr_in *server_add) {
-    int sock, r;
+    int r;
 
     lprintf("{client %d}Creating TCP stream socket\n", getpid());
-    if((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+    if((client_sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("socket\n");
         exit(1);
     }
@@ -43,12 +43,12 @@ int init_client(struct sockaddr_in *server_add) {
     server_add->sin_addr.s_addr = htonl(INADDR_ANY);
 
     lprintf("{client %d}Binding socket to server address\n", getpid());
-    if((r = connect(sock, (struct sockaddr*)server_add, sizeof(*server_add))) < 0) {
+    if((r = connect(client_sock, (struct sockaddr*)server_add, sizeof(*server_add))) < 0) {
         perror("connect");
         exit(1);
     }
 
-    return sock;
+    return client_sock;
 }
 
 void write_loop(int sock) {
@@ -137,11 +137,11 @@ void read_write_loop(int sock) {
     }
 }
 
-void run_client(void) {
+void run_client(struct sockaddr_in *server_add) {
     int sock;
 
-    sock = init_client(&server_addr);
-    read_write_loop(sock);
+    sock = init_client(&server_add);
+    read_write_loop(client_sock);
 }
 //
 //int main(int argc, char *argv[]) {

@@ -20,7 +20,6 @@
 #define SERVER_PORT 1234
 #define SIZEOF_INT sizeof(int)
 
-extern struct sockaddr_in server_addr;
 extern int server_sock;
 
 // server->client comms flags

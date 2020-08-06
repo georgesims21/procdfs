@@ -51,6 +51,7 @@ static void *procsys_init(struct fuse_conn_info *conn,
                       struct fuse_config *cfg) {
 
     (void) conn;
+    struct sockaddr_in server_addr;
     sleep(2); // to allow for server to start on run config
     cfg->use_ino = 1;
 
