@@ -37,7 +37,6 @@
 #include "defs.h"
 
 int server_sock;
-int CLIENT_FLAG;
 int pipecomms[2];
 
 /*
