@@ -36,7 +36,7 @@
 #include "writer.h"
 #include "defs.h"
 
-int server_sock;
+int client_socket;
 int pipecomms[2];
 
 /*
@@ -67,7 +67,7 @@ static void *procsys_init(struct fuse_conn_info *conn,
     cfg->negative_timeout = 0;
 
     // init client
-    server_sock = init_client(&server_addr);
+    client_socket = init_client(&server_addr);
     int pid;
     pipe(pipecomms);
     if((pid = fork()) < 0) {
@@ -77,7 +77,8 @@ static void *procsys_init(struct fuse_conn_info *conn,
     } else if (pid == 0) {
         // child
         close(pipecomms[0]); // reader process only needs to write to parent
-        read_loop(server_sock);
+        read_loop(client_socket, pipecomms[1]);
+
     }
     close(pipecomms[1]); // parent only needs to listen to the reader process
 
@@ -207,7 +208,7 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
     if(fi == NULL)
         close(fd);
 
-    fetch_from_server(buffer, fp, buf, NME_MSG_CLI, server_sock, pipecomms[0]);
+    fetch_from_server(buffer, fp, buf, NME_MSG_CLI, client_socket, pipecomms[0]);
     return res;
 }
 

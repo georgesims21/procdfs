@@ -13,14 +13,10 @@
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "EndlessLoop"
 
-
-
 #define SERVER_HOST "localhost"
 #define SERVER_IP "127.0.0.1"
 #define SERVER_PORT 1234
 #define SIZEOF_INT sizeof(int)
-
-extern int server_sock;
 
 // server->client comms flags
 #define CONN_MSG_SER    1 // initial connection message

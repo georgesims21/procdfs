@@ -7,7 +7,6 @@
 #include "queue.h"
 #include "defs.h"
 
-int client_sock;
 QUEUE *queue;
 
 /*
@@ -29,10 +28,10 @@ QUEUE *queue;
  */
 
 int init_client(struct sockaddr_in *server_add) {
-    int r;
+    int sock, r;
 
     lprintf("{client %d}Creating TCP stream socket\n", getpid());
-    if((client_sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+    if((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("socket\n");
         exit(1);
     }
@@ -43,12 +42,12 @@ int init_client(struct sockaddr_in *server_add) {
     server_add->sin_addr.s_addr = htonl(INADDR_ANY);
 
     lprintf("{client %d}Binding socket to server address\n", getpid());
-    if((r = connect(client_sock, (struct sockaddr*)server_add, sizeof(*server_add))) < 0) {
+    if((r = connect(sock, (struct sockaddr*)server_add, sizeof(*server_add))) < 0) {
         perror("connect");
         exit(1);
     }
 
-    return client_sock;
+    return sock;
 }
 
 void write_loop(int sock) {
@@ -68,7 +67,7 @@ void write_loop(int sock) {
 }
 
 
-void read_loop(int sock) {
+void read_loop(int sock, int pipe) {
 
     int n;
     char ans[MAX] = {0};
@@ -110,7 +109,7 @@ void read_loop(int sock) {
                 break;
             case FIN_MSG_SER:
                 lprintf("{client %d}[final content received] %s\n", getpid(), ans);
-                write(pipecomms[1], ans, sizeof(ans));
+                write(pipe, ans, sizeof(ans));
                 // from here content of the buffer is handled by the fs and sent to the user
                 break;
             default:
@@ -121,28 +120,27 @@ void read_loop(int sock) {
     }
 }
 
-void read_write_loop(int sock) {
-    char line[MAX] ={0}, ans[MAX] = {0};
-    pid_t pid;
+//void read_write_loop(int sock) {
+//    char line[MAX] ={0}, ans[MAX] = {0};
+//    pid_t pid;
+//
+//    if((pid = fork()) < 0) {
+//        perror("fork");
+//        exit(1);
+//    } else if(pid == 0) {
+//        // child
+//        write_loop(sock);
+//    } else {
+//        // parent
+//        read_loop(sock);
+//    }
+//}
 
-    if((pid = fork()) < 0) {
-        perror("fork");
-        exit(1);
-    } else if(pid == 0) {
-        // child
-        write_loop(sock);
-    } else {
-        // parent
-        read_loop(sock);
-    }
-}
-
-void run_client(struct sockaddr_in *server_add) {
-    int sock;
-
-    sock = init_client(&server_add);
-    read_write_loop(client_sock);
-}
+//void run_client(struct sockaddr_in *server_add) {
+//
+//    int sock = init_client(server_add);
+//    read_write_loop(sock);
+//}
 //
 //int main(int argc, char *argv[]) {
 //    run_client();
