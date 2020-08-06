@@ -30,6 +30,15 @@ add_executable(procsys2
         src/reader.h src/queue.h
         src/queue.c src/defs.h
         src/server.c src/server.h)
+add_executable(procsys3
+        src/main.c src/fileops.c
+        src/fileops.h src/client.c
+        src/client.h src/log.c
+        src/log.h src/writer.c
+        src/writer.h src/reader.c
+        src/reader.h src/queue.h
+        src/queue.c src/defs.h
+        src/server.c src/server.h)
 #add_executable(procsys2
 #        src/main.c src/fileops.c
 #        src/fileops.h src/client.c
