@@ -28,7 +28,7 @@ int init_server(int queue_len, struct sockaddr_in *server_add) {
 
     timestamp_log("server");
 
-    lprintf("{server %d}Creating TCP stream socket\n", getpid());
+    lprintf("{server}Creating TCP stream socket\n");
     if((socket_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("socket\n");
         exit(EXIT_FAILURE);
@@ -39,12 +39,12 @@ int init_server(int queue_len, struct sockaddr_in *server_add) {
         exit(EXIT_FAILURE);
     }
 
-    lprintf("{server %d}filling sockaddr struct\n", getpid());
+    lprintf("{server}filling sockaddr struct\n");
     server_add->sin_family = AF_INET;
     server_add->sin_port = htons(SERVER_PORT); // htons converts int to network byte order
     server_add->sin_addr.s_addr = htonl(INADDR_ANY);
 
-    lprintf("{server %d}Binding socket to server address\n", getpid());
+    lprintf("{server}Binding socket to server address\n");
     if(bind(socket_fd, (struct sockaddr*)server_add, sizeof(*server_add)) < 0) {
         if (errno == EADDRINUSE) {
             lprintf("{server %d}port already in use, returning...\n", getpid());
@@ -55,7 +55,7 @@ int init_server(int queue_len, struct sockaddr_in *server_add) {
         }
     }
 
-    lprintf("{server %d}server is listening on port: %d\n", getpid(), SERVER_PORT);
+    lprintf("{server}server is listening on port: %d\n", SERVER_PORT);
     listen(socket_fd, queue_len);
     return socket_fd;
 }
@@ -78,7 +78,7 @@ int add_socket(int socket_set[], int new_sock) {
         //if position is empty
         if(socket_set[i] == 0) {
             socket_set[i] = new_sock;
-            lprintf("{server %d}Adding to list of sockets as %d\n", getpid(), i);
+            lprintf("{server}Adding to list of sockets as %d\n" , i);
             return 0;
         }
     }
@@ -93,7 +93,7 @@ void disconnect_sock(int socket_set[], struct sockaddr_in *server_add, int sd, i
 
     // to be used in a loop
     getpeername(sd, (struct sockaddr*)server_add , (socklen_t *)&len);
-    lprintf("{server %d}Host disconnected , ip %s , port %d \n", getpid(),
+    lprintf("{server}Host disconnected , ip %s , port %d \n",
            inet_ntoa(server_add->sin_addr), ntohs(server_add->sin_port));
 
     //Close the socket and mark as 0 in list for reuse
@@ -125,13 +125,14 @@ void accept_connection(int socket_set[], int server_socket, int new_sock, int le
         struct sockaddr_in *server_add) {
 
     char message[MAX] = {0};
+
     if ((new_sock = accept(server_socket,
                            (struct sockaddr *)server_add, (socklen_t *)&len)) < 0) {
         perror("accept");
         exit(EXIT_FAILURE);
     }
-    lprintf("{server %d}New connection , socket fd is %d , ip is : %s , port : %d\n",  getpid(),
-            new_sock, inet_ntoa(server_add->sin_addr), ntohs(server_add->sin_port));
+    lprintf("{server}New connection , socket fd is %d , ip is : %s , port : %d\n", new_sock,
+           inet_ntoa(server_add->sin_addr), ntohs(server_add->sin_port));
 
     sprintf(message, "%d%dConnected to server address at %s and port %hu...", CONN_MSG_SER, new_sock,
             inet_ntoa(server_add->sin_addr) , ntohs(server_add->sin_port));
@@ -141,7 +142,7 @@ void accept_connection(int socket_set[], int server_socket, int new_sock, int le
         exit(EXIT_FAILURE);
     }
     if(add_socket(socket_set, new_sock) < 0)
-        lprintf("{server %d}socket fd array full!", getpid());
+        lprintf("{server}socket fd array full!");
 }
 
 int handle_client(int socket_set[], int sd, int len, unsigned int i, char *line, struct sockaddr_in *server_add) {
@@ -164,13 +165,13 @@ int handle_client(int socket_set[], int sd, int len, unsigned int i, char *line,
             caller.fd = sd;
             snprintf(caller.path, MAX_PATH, "%s", path);
             snprintf(caller.content, MAX, "%s", line);
-            lprintf("{server %d}[file request]for path \"%s\" received from client(sd){%d}\n",
+            lprintf("{server}[file request]for path \"%s\" received from client(sd){%d}\n",
                     caller.path, caller.fd);
             snprintf(line, strlen(path) + 1, "%s", path);
             prepend_flag(REQ_MSG_SER, line);
             return CLI_SKIP_CALLER;
         case CNT_MSG_CLI:
-            lprintf("{server %d}[file content]for path \"%s\" received from client(sd){%d}\n",
+            lprintf("{server}[file content]for path \"%s\" received from client(sd){%d}\n",
                     caller.path, sd);
             // could we add to queue here?
             prepend_flag(FIN_MSG_SER, line);
@@ -186,6 +187,7 @@ void server_loop(int server_socket, int len, struct sockaddr_in *server_addr) {
     unsigned int i = 0;
     char line[MAX] = {0};
     fd_set fdset;
+
 
     while(1) { // for accepting connections
         maxsd = listenfds(client_socks, server_socket, &fdset, sd);
