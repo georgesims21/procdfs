@@ -125,8 +125,6 @@ void accept_connection(int socket_set[], int server_socket, int new_sock, int le
         struct sockaddr_in *server_add) {
 
     char message[MAX] = {0};
-    sprintf(message, "%d%dConnected to server address at %s and port %hu...", CONN_MSG_SER, new_sock,
-            inet_ntoa(server_add->sin_addr) , ntohs(server_add->sin_port));
 
     if ((new_sock = accept(server_socket,
                            (struct sockaddr *)server_add, (socklen_t *)&len)) < 0) {
@@ -135,6 +133,9 @@ void accept_connection(int socket_set[], int server_socket, int new_sock, int le
     }
     lprintf("{server}New connection , socket fd is %d , ip is : %s , port : %d\n", new_sock,
            inet_ntoa(server_add->sin_addr), ntohs(server_add->sin_port));
+
+    sprintf(message, "%d%dConnected to server address at %s and port %hu...", CONN_MSG_SER, new_sock,
+            inet_ntoa(server_add->sin_addr) , ntohs(server_add->sin_port));
 
     if(send(new_sock, message, strlen(message), 0) != strlen(message)) {
         perror("send");
