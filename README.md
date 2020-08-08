@@ -59,10 +59,10 @@ TODO:
       (basic client/server model that I assumed)
 
     - [x] 2.1: Build a basic client-server model and assume a TCP connection
-    - [ ] 2.3: Merge logic into filesystem
-      - [ ] 2.3.1: First model should use server to do all work and comms between clients
+    - [x] 2.3: Merge logic into filesystem
+      - [x] 2.3.1: First model should use server to do all work and comms between clients
           - [plan](doc/networking-read()call-flowchart.pdf)
-      - [ ] 2.3.2: Second model should have all fs' as servers and clients to each other
+      - [x] 2.3.2: Second model should have all fs' as servers and clients to each other
     - [ ] 2.4: Congregate some files and run tests with net-tools
     - [ ] 2.5 (extra): Convert it into a secure client-server with openssl libs
  
