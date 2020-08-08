@@ -36,11 +36,6 @@ int init_client(struct sockaddr_in *server_add) {
         exit(1);
     }
 
-    lprintf("{client %d}filling sockaddr struct\n", getpid());
-    server_add->sin_family = AF_INET;
-    server_add->sin_port = htons(SERVER_PORT); // htons converts int to network byte order
-    server_add->sin_addr.s_addr = htonl(INADDR_ANY);
-
     lprintf("{client %d}Binding socket to server address\n", getpid());
     if((r = connect(sock, (struct sockaddr*)server_add, sizeof(*server_add))) < 0) {
         perror("connect");
