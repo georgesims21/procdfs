@@ -8,6 +8,7 @@
 #include "defs.h"
 
 QUEUE *queue;
+int fd;
 
 /*
  * TODO
@@ -77,6 +78,7 @@ void read_loop(int sock, int pipe) {
         }
         switch(parse_flag(ans)) {
             case CONN_MSG_SER:
+                fd = parse_flag(ans); // get the fd of the client
                 lprintf("{client %d}[connection message] %s\n", getpid(), ans);
                 break;
             case REQ_MSG_SER:

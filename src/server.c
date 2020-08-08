@@ -125,7 +125,7 @@ void accept_connection(int socket_set[], int server_socket, int new_sock, int le
         struct sockaddr_in *server_add) {
 
     char message[MAX] = {0};
-    sprintf(message, "%dConnected to server address at %s and port %hu...", CONN_MSG_SER,
+    sprintf(message, "%d%dConnected to server address at %s and port %hu...", CONN_MSG_SER, new_sock,
             inet_ntoa(server_add->sin_addr) , ntohs(server_add->sin_port));
 
     if ((new_sock = accept(server_socket,
