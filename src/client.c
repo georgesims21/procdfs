@@ -8,6 +8,7 @@
 #include "defs.h"
 
 QUEUE *queue;
+int clientfd;
 
 /*
  * TODO
@@ -35,11 +36,6 @@ int init_client(struct sockaddr_in *server_add) {
         perror("socket\n");
         exit(1);
     }
-
-    lprintf("{client %d}filling sockaddr struct\n", getpid());
-    server_add->sin_family = AF_INET;
-    server_add->sin_port = htons(SERVER_PORT); // htons converts int to network byte order
-    server_add->sin_addr.s_addr = htonl(INADDR_ANY);
 
     lprintf("{client %d}Binding socket to server address\n", getpid());
     if((r = connect(sock, (struct sockaddr*)server_add, sizeof(*server_add))) < 0) {
@@ -77,15 +73,16 @@ void read_loop(int sock, int pipe) {
             perror("read");
             exit(1);
         } else if(n == 0) {
-            lprintf("{client %d}Server disconnected.. exiting\n", getpid());
+            lprintf("{client %d}Server disconnected.. exiting\n", clientfd);
             exit(1);
         }
         switch(parse_flag(ans)) {
             case CONN_MSG_SER:
-                lprintf("{client %d}[connection message] %s\n", getpid(), ans);
+                clientfd = parse_flag(ans); // get the fd of the client
+                lprintf("{client %d}[connection message] %s\n", clientfd, ans);
                 break;
             case REQ_MSG_SER:
-                lprintf("{client %d}[file request]for path: \"%s\"\n", getpid(), ans);
+                lprintf("{client %d}[file request]for path: \"%s\"\n", clientfd, ans);
                 // from here content of the file is fetched and sent to the server
                 int fd = -1, res = 0, offset = 0, size = 0;
                 char buf[4096] = {0};
@@ -108,12 +105,12 @@ void read_loop(int sock, int pipe) {
                 }
                 break;
             case FIN_MSG_SER:
-                lprintf("{client %d}[final content received] %s\n", getpid(), ans);
+                lprintf("{client %d}[final content received] %s\n", clientfd, ans);
                 write(pipe, ans, sizeof(ans));
                 // from here content of the buffer is handled by the fs and sent to the user
                 break;
             default:
-                lprintf("{client %d}[other] %s\n", getpid(), ans);
+                lprintf("{client %d}[other] %s\n", clientfd, ans);
                 break;
         }
         memset(ans, 0, sizeof(ans));
