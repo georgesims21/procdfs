@@ -47,7 +47,7 @@ int init_server(int queue_len, struct sockaddr_in *server_add) {
     lprintf("{server}Binding socket to server address\n");
     if(bind(socket_fd, (struct sockaddr*)server_add, sizeof(*server_add)) < 0) {
         if (errno == EADDRINUSE) {
-            lprintf("{server %d}port already in use, returning...\n", getpid());
+            lprintf("{server %d}address already in use, returning...\n", getpid());
             return -1;
         } else {
             perror("bind");
