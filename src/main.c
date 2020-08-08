@@ -80,8 +80,6 @@ static void *procsys_init(struct fuse_conn_info *conn,
         }
     }
 
-    sleep(2);
-
     // init client
     client_socket = init_client(&server_addr);
     int pid;
