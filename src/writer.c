@@ -33,12 +33,27 @@ void append_content(char *content, char *buf, int padding) {
 void fetch_from_server(char *filebuf, const char *fp, char *buf, int flag, int serversock, int pipe) {
     char tmpbuf[MAX] = {0};
     char reply[MAX] = {0};
+    size_t flen = 1, fplen = strlen(fp), buflen = strlen(filebuf) + MAX_FLAG + MAX_PATH + 1;
+    // make space for the buffer: |flag|path|file content|'\0'|
+    //               size(bytes):   1    64       n         1
+    char *tmp = malloc(buflen * sizeof(char));
+    tmp[0] = '\0';
+    tmp[buflen] = '\0';
 
-    prepend_flag(flag, tmpbuf);
-    append_path(fp, tmpbuf, 1);
-    append_content(filebuf, tmpbuf, MAX_PATH);
+    // file content
+    strncpy(tmp, filebuf, strlen(filebuf));
 
-    write(serversock, tmpbuf, strlen(tmpbuf));
+    // flag
+    char fl = flag + '0';
+    memmove(tmp + MAX_FLAG, tmp, strlen(tmp) + 1);
+    memcpy(tmp, &fl, MAX_FLAG);
+
+    // path
+    memmove(tmp + MAX_FLAG + MAX_PATH, tmp + MAX_FLAG, strlen(tmp) + 1);
+    memcpy(&tmp[MAX_FLAG], fp, fplen);
+
+    write(serversock, tmp, strlen(tmp));
+    free(tmp);
     read(pipe, &reply, sizeof(reply)); // wait for the final file from reader process
 
     snprintf(buf, strlen(reply), "%s", reply);

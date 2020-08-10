@@ -160,8 +160,8 @@ int handle_client(int socket_set[], int sd, int len, unsigned int i, char *line,
 
     switch(parse_flag(line)) {
         case NME_MSG_CLI:
-            remove_pid(line);
             parse_path(path, line);
+            remove_pid(line);
             caller.fd = sd;
             snprintf(caller.path, MAX_PATH, "%s", path);
             snprintf(caller.content, MAX, "%s", line);

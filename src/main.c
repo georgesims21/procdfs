@@ -117,7 +117,6 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
      */
     if((stbuf->st_mode & S_IFMT) == S_IFREG)
         stbuf->st_size = procsize(fpath);
-//        stbuf->st_size = 0;
 
     return 0;
 }
@@ -204,7 +203,7 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
 
     int fd;
     int res;
-    char buffer[MAX] = {0};
+//    char buffer[MAX] = {0};
     const char *fp = final_path(path);
 
     if(fi == NULL)
@@ -215,7 +214,10 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
     if (fd == -1)
         return -errno;
 
+    int filesize = procsizefd(fd);
+    char *buffer = malloc((filesize * sizeof(char)) + 1);
     res = pread(fd, buffer, size, offset);
+    buffer[filesize + 1] = '\0';
     if (res == -1)
         res = -errno;
 
@@ -223,6 +225,7 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
         close(fd);
 
     fetch_from_server(buffer, fp, buf, NME_MSG_CLI, client_socket, pipecomms[0]);
+    free(buffer);
     return res;
 }
 
