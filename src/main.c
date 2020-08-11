@@ -35,6 +35,7 @@
 #include "client.h"
 #include "server.h"
 #include "writer.h"
+#include "reader.h"
 #include "defs.h"
 
 int client_socket;
@@ -68,6 +69,7 @@ static void *procsys_init(struct fuse_conn_info *conn,
     cfg->attr_timeout = 0;
     cfg->negative_timeout = 0;
 
+    // if address is already in use then don't run a server
     if((server_socket = init_server(10, &server_addr)) > -1) {
         int pid;
         if((pid = fork()) < 0) {
@@ -92,7 +94,6 @@ static void *procsys_init(struct fuse_conn_info *conn,
         // child
         close(pipecomms[0]); // reader process only needs to write to parent
         read_loop(client_socket, pipecomms[1]);
-
     }
     close(pipecomms[1]); // parent only needs to listen to the reader process
 
@@ -117,7 +118,6 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
      */
     if((stbuf->st_mode & S_IFMT) == S_IFREG)
         stbuf->st_size = procsize(fpath);
-//        stbuf->st_size = 0;
 
     return 0;
 }
@@ -204,8 +204,9 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
 
     int fd;
     int res;
-    char buffer[MAX] = {0};
-    const char *fp = final_path(path);
+    char *tmp = (char *)final_path(path);
+    remove_pid(tmp);
+    const char *fp = tmp;
 
     if(fi == NULL)
         fd = openat(AT_FDCWD, fp, O_RDONLY);
@@ -215,7 +216,10 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
     if (fd == -1)
         return -errno;
 
+    int filesize = procsizefd(fd);
+    char *buffer = malloc((filesize * sizeof(char)) + 1);
     res = pread(fd, buffer, size, offset);
+    buffer[filesize + 1] = '\0';
     if (res == -1)
         res = -errno;
 
@@ -223,6 +227,7 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
         close(fd);
 
     fetch_from_server(buffer, fp, buf, NME_MSG_CLI, client_socket, pipecomms[0]);
+    free(buffer);
     return res;
 }
 

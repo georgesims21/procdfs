@@ -47,7 +47,7 @@ int init_server(int queue_len, struct sockaddr_in *server_add) {
     lprintf("{server}Binding socket to server address\n");
     if(bind(socket_fd, (struct sockaddr*)server_add, sizeof(*server_add)) < 0) {
         if (errno == EADDRINUSE) {
-            lprintf("{server %d}port already in use, returning...\n", getpid());
+            lprintf("{server %d}address already in use, returning...\n", getpid());
             return -1;
         } else {
             perror("bind");
@@ -85,7 +85,7 @@ int add_socket(int socket_set[], int new_sock) {
     return -1; // array full
 }
 
-void disconnect_sock(int socket_set[], struct sockaddr_in *server_add, int sd, int len, int arrpos) {
+void disconnect_sock(int socket_set[], struct sockaddr_in *server_add, int sd, int len, unsigned int arrpos) {
     /*
      * TODO
      *  - [ ] error checking for close method
@@ -152,24 +152,21 @@ int handle_client(int socket_set[], int sd, int len, unsigned int i, char *line,
     int pid = 0;
     if ((read(sd, line, READ_MAX)) == 0) {
         //Somebody disconnected
-        disconnect_sock(socket_set, server_add, sd, len, i);
         return CLI_DISCONNECT;
     }
     // Client message
-    line[TERM_CHAR_MAX] = '\0';
+//    line[TERM_CHAR_MAX] = '\0';
 
     switch(parse_flag(line)) {
         case NME_MSG_CLI:
-            remove_pid(line);
-            parse_path(path, line);
             caller.fd = sd;
-            snprintf(caller.path, MAX_PATH, "%s", path);
-            snprintf(caller.content, MAX, "%s", line);
+            snprintf(caller.path, MAX_PATH, "%s", line);
+            memset(line, 0, sizeof(line));
             lprintf("{server}[file request]for path \"%s\" received from client(sd){%d}\n",
                     caller.path, caller.fd);
-            snprintf(line, strlen(path) + 1, "%s", path);
+            snprintf(line, strlen(caller.path) + 1, "%s", caller.path);
             prepend_flag(REQ_MSG_SER, line);
-            return CLI_SKIP_CALLER;
+            return CLI_SEND_ALL;
         case CNT_MSG_CLI:
             lprintf("{server}[file content]for path \"%s\" received from client(sd){%d}\n",
                     caller.path, sd);
@@ -202,12 +199,13 @@ void server_loop(int server_socket, int len, struct sockaddr_in *server_addr) {
                 //Check if it was for closing , and also read the incoming message
                 switch (handle_client(client_socks, sd, len, i, line, server_addr)) {
                     case CLI_DISCONNECT:
+                        disconnect_sock(client_socks, server_addr, sd, len, i);
                         break;
-                    case CLI_SKIP_CALLER:
+                    case CLI_SEND_ALL:
                         // requesting the file from all clients but the caller
                         for(unsigned int j = 0; j < MAX_CLIENTS; j++) {
-                            if(caller.fd == client_socks[j])
-                                continue;
+//                            if(caller.fd == client_socks[j])
+//                                continue;
                             send(client_socks[j], line, strlen(line), 0);
                         }
                         break;
