@@ -7,7 +7,7 @@
 #include "queue.h"
 #include "defs.h"
 
-QUEUE *queue;
+//QUEUE *queue;
 int clientfd;
 
 /*
@@ -45,22 +45,22 @@ int init_client(struct sockaddr_in *server_add) {
 
     return sock;
 }
-
-void write_loop(int sock) {
-    char line[MAX] = {0};
-
-    BUFELEM *tmpbuf = {0};
-    while(1) {
-        if(lenq(&queue)) {
-            memset(tmpbuf, 0, sizeof(&tmpbuf));
-            tmpbuf = dequeue(&queue);
-            if((write(sock, tmpbuf->buf, strlen(tmpbuf->buf))) < 0) {
-                perror("write");
-                exit(1);
-            }
-        }
-    }
-}
+//
+//void write_loop(int sock) {
+//    char line[MAX] = {0};
+//
+//    BUFELEM *tmpbuf = {0};
+//    while(1) {
+//        if(lenq(&queue)) {
+//            memset(tmpbuf, 0, sizeof(&tmpbuf));
+//            tmpbuf = dequeue(&queue);
+//            if((write(sock, tmpbuf->buf, strlen(tmpbuf->buf))) < 0) {
+//                perror("write");
+//                exit(1);
+//            }
+//        }
+//    }
+//}
 
 
 void read_loop(int sock, int pipe) {

@@ -35,6 +35,7 @@
 #include "client.h"
 #include "server.h"
 #include "writer.h"
+#include "reader.h"
 #include "defs.h"
 
 int client_socket;
@@ -203,8 +204,9 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
 
     int fd;
     int res;
-//    char buffer[MAX] = {0};
-    const char *fp = final_path(path);
+    char *tmp = (char *)final_path(path);
+    remove_pid(tmp);
+    const char *fp = tmp;
 
     if(fi == NULL)
         fd = openat(AT_FDCWD, fp, O_RDONLY);

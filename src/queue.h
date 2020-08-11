@@ -12,7 +12,7 @@ typedef struct queue {
 
 typedef struct bufelem {
     char *buf;
-    int complete;
+    char complete;
 }BUFELEM;
 
 

@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include "reader.h"
 #include "defs.h"
+#include "log.h"
 
 int parse_flag(char *buf) {
     // ASCII magic: https://stackoverflow.com/questions/5029840/convert-char-to-int-in-c-and-c

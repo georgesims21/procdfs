@@ -3,11 +3,6 @@
 #include "defs.h"
 #include "log.h"
 
-/*
- * TODO
- *  [ ] document the buffer, first 64bytes for flag and pathname, rest for content
- */
-
 void prepend_flag(int flag, char *buf) {
     // assumes buf is null terminated
     // https://stackoverflow.com/questions/2328182/prepending-to-a-string
@@ -44,22 +39,21 @@ void fetch_from_server(char *filebuf, const char *fp, char *buf, int flag, int s
     //               size(bytes):   1    64       n         1
     // where n <= MAX - (MAX_FLAG + MAX_PATH + 1)
 
-    char tmp[MAX] = {0};
     char reply[MAX] = {0};
-    size_t flen = 1, fplen = strlen(fp), buflen = strlen(filebuf), total = buflen + MAX_FLAG + MAX_PATH + 1;
-    tmp[total] = '\0';
+    size_t flen = 1, fplen = strlen(fp), total = MAX_FLAG + MAX_PATH + 1;
+    char *tmp = (char *)calloc(0, total * sizeof(char));
 
     //flag
     char fl = flag + '0';
-    strncpy(&tmp[0], &fl, flen);
+    strncpy(&tmp[0], &fl, MAX_FLAG);
 
     //path
     strncpy(&tmp[MAX_FLAG], fp, fplen);
 
-    //content
-    strncpy(&tmp[MAX_FLAG + MAX_PATH], filebuf, buflen);
+    tmp[total] = '\0';
 
     write(serversock, tmp, strlen(tmp));
+    free(tmp);
     read(pipe, &reply, sizeof(reply)); // wait for the final file from reader process
 
     snprintf(buf, strlen(reply), "%s", reply);

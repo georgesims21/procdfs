@@ -4,7 +4,7 @@
 #include "defs.h"
 
 #define CLI_DISCONNECT 6
-#define CLI_SKIP_CALLER 7
+#define CLI_SEND_ALL 7
 #define CLI_SEND_CALLER 8
 
 int init_server(int queue_len, struct sockaddr_in *server_add);
