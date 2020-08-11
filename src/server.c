@@ -85,7 +85,7 @@ int add_socket(int socket_set[], int new_sock) {
     return -1; // array full
 }
 
-void disconnect_sock(int socket_set[], struct sockaddr_in *server_add, int sd, int len, int arrpos) {
+void disconnect_sock(int socket_set[], struct sockaddr_in *server_add, int sd, int len, unsigned int arrpos) {
     /*
      * TODO
      *  - [ ] error checking for close method
@@ -152,7 +152,6 @@ int handle_client(int socket_set[], int sd, int len, unsigned int i, char *line,
     int pid = 0;
     if ((read(sd, line, READ_MAX)) == 0) {
         //Somebody disconnected
-        disconnect_sock(socket_set, server_add, sd, len, i);
         return CLI_DISCONNECT;
     }
     // Client message
@@ -161,7 +160,6 @@ int handle_client(int socket_set[], int sd, int len, unsigned int i, char *line,
     switch(parse_flag(line)) {
         case NME_MSG_CLI:
             parse_path(path, line);
-            remove_pid(line);
             caller.fd = sd;
             snprintf(caller.path, MAX_PATH, "%s", path);
             snprintf(caller.content, MAX, "%s", line);
@@ -202,6 +200,7 @@ void server_loop(int server_socket, int len, struct sockaddr_in *server_addr) {
                 //Check if it was for closing , and also read the incoming message
                 switch (handle_client(client_socks, sd, len, i, line, server_addr)) {
                     case CLI_DISCONNECT:
+                        disconnect_sock(client_socks, server_addr, sd, len, i);
                         break;
                     case CLI_SKIP_CALLER:
                         // requesting the file from all clients but the caller
