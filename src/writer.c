@@ -1,6 +1,7 @@
 #include "writer.h"
 #include "client-server.h"
 #include "defs.h"
+#include "log.h"
 
 /*
  * TODO
@@ -12,10 +13,11 @@ void prepend_flag(int flag, char *buf) {
     // https://stackoverflow.com/questions/2328182/prepending-to-a-string
     // tried countlessly but it doesn't like + '0' when memmoving
 
-    char tmp = flag + '0';
-    size_t len = sizeof(tmp);
+    char fl = flag + '0';
+    size_t len = sizeof(fl);
     memmove(buf + len, buf, strlen(buf) + 1);
-    buf[0] = tmp; // feels dirtier than mmove but works
+//    buf[0] = tmp; // feels dirtier than mmove but works
+    strncpy(&buf[0], &fl, len);
 }
 
 void append_path(const char *path, char *buf, int padding) {
@@ -31,29 +33,33 @@ void append_content(char *content, char *buf, int padding) {
 }
 
 void fetch_from_server(char *filebuf, const char *fp, char *buf, int flag, int serversock, int pipe) {
-    char tmpbuf[MAX] = {0};
-    char reply[MAX] = {0};
-    size_t flen = 1, fplen = strlen(fp), buflen = strlen(filebuf) + MAX_FLAG + MAX_PATH + 1;
+    /*
+     * TODO
+     *  - Find out why heap allocated buffer doesn't allow for string manipulation (like below).
+     *    Tried many different approaches: memmove, snprintf with padding, pointers to the buf @
+     *    + MAX_PATH + MAX_FLAG and strcpy to those pointers.
+     */
+
     // make space for the buffer: |flag|path|file content|'\0'|
     //               size(bytes):   1    64       n         1
-    char *tmp = malloc(buflen * sizeof(char));
-    tmp[0] = '\0';
-    tmp[buflen] = '\0';
+    // where n <= MAX - (MAX_FLAG + MAX_PATH + 1)
 
-    // file content
-    strncpy(tmp, filebuf, strlen(filebuf));
+    char tmp[MAX] = {0};
+    char reply[MAX] = {0};
+    size_t flen = 1, fplen = strlen(fp), buflen = strlen(filebuf), total = buflen + MAX_FLAG + MAX_PATH + 1;
+    tmp[total] = '\0';
 
-    // flag
+    //flag
     char fl = flag + '0';
-    memmove(tmp + MAX_FLAG, tmp, strlen(tmp) + 1);
-    memcpy(tmp, &fl, MAX_FLAG);
+    strncpy(&tmp[0], &fl, flen);
 
-    // path
-    memmove(tmp + MAX_FLAG + MAX_PATH, tmp + MAX_FLAG, strlen(tmp) + 1);
-    memcpy(&tmp[MAX_FLAG], fp, fplen);
+    //path
+    strncpy(&tmp[MAX_FLAG], fp, fplen);
+
+    //content
+    strncpy(&tmp[MAX_FLAG + MAX_PATH], filebuf, buflen);
 
     write(serversock, tmp, strlen(tmp));
-    free(tmp);
     read(pipe, &reply, sizeof(reply)); // wait for the final file from reader process
 
     snprintf(buf, strlen(reply), "%s", reply);
