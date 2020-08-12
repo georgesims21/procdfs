@@ -6,6 +6,7 @@
 #define CLI_DISCONNECT 6
 #define CLI_SEND_ALL 7
 #define CLI_SEND_CALLER 8
+#define END_PROC_SER 9
 
 int init_server(int queue_len, struct sockaddr_in *server_add);
 int add_clients(int socket_set[], int sd, int maxsd, fd_set *newfdset);

@@ -1,4 +1,5 @@
 #include "queue.h"
+#include "log.h"
 #include "defs.h"
 
 int enqueue(QUEUE **queue, BUFELEM *bufelem) {
@@ -6,6 +7,7 @@ int enqueue(QUEUE **queue, BUFELEM *bufelem) {
  * TODO
  *   * Error check the malloc with errno
  */
+    lprintf("{queue} starting enqueue\n");
     QUEUE *qp = *queue;
     QUEUE *new_elem = (QUEUE *)malloc(sizeof(QUEUE));
     if(!new_elem) {
@@ -24,7 +26,7 @@ int enqueue(QUEUE **queue, BUFELEM *bufelem) {
         qp->next = new_elem;
     }
     new_elem->next = NULL;
-    printf("Enqueue'd node: \"%s\"\n", new_elem->node->buf);
+    lprintf("{queue} Enqueue'd node: \"%s\"\n", new_elem->node->buf);
     return 0;
 }
 
@@ -37,7 +39,7 @@ BUFELEM *dequeue(QUEUE **queue) {
     BUFELEM *elem = NULL;
     if(!qp) {
         // Empty queue
-        printf("queue already empty!");
+        printf("{queue} queue already empty!");
     } else {
         elem = qp->node;
         free(qp->node);
@@ -46,7 +48,7 @@ BUFELEM *dequeue(QUEUE **queue) {
         } else {
             *queue = NULL;
         }
-        printf("Dequeued NODE: %s\n", elem->buf);
+        lprintf("{queue} Dequeued NODE: %s\n", elem->buf);
     }
     return elem;
 }
@@ -56,10 +58,10 @@ void printq(QUEUE **queue) {
     QUEUE *qp = *queue;
     int count = 0;
     if(!qp)
-        printf("Empty queue!\n");
+        lprintf("{queue} Empty queue!\n");
     else {
         while (qp) {
-            printf("queue[%d]:\t%s\n", count, qp->node->buf);
+            lprintf("{queue} queue[%d]:\t%s\n", count, qp->node->buf);
             qp = qp->next;
             count++;
         }
@@ -70,7 +72,7 @@ int dealloq(QUEUE **queue) {
 
     QUEUE *qp = *queue;
     if(!qp) {
-        printf("Queue is empty, not dealloq'ing");
+        lprintf("{queue} Queue is empty, not dealloq'ing");
         return -1;
     }
     else {
@@ -80,7 +82,7 @@ int dealloq(QUEUE **queue) {
             qp = qp->next;
         }
     }
-    printf("Dealloq'ed..");
+    lprintf("{queue} Dealloq'ed..");
     return 0;
 }
 

@@ -27,7 +27,7 @@ void append_content(char *content, char *buf, int padding) {
     snprintf(&buf[padding], len + 1, "%s", content);
 }
 
-void fetch_from_server(char *filebuf, const char *fp, char *buf, int flag, int serversock, int pipe) {
+void fetch_from_server(const char *fp, char **buf, int flag, int serversock, int pipe) {
     /*
      * TODO
      *  - Find out why heap allocated buffer doesn't allow for string manipulation (like below).
@@ -56,7 +56,7 @@ void fetch_from_server(char *filebuf, const char *fp, char *buf, int flag, int s
     write(serversock, tmp, strlen(tmp));
     read(pipe, &reply, sizeof(reply)); // wait for the final file from reader process
 
-    snprintf(buf, strlen(reply), "%s", reply);
+    snprintf(*buf, strlen(reply), "%s", reply);
 }
 
 

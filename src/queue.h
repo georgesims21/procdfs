@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "defs.h"
 
 typedef struct queue {
     struct queue *next;
@@ -11,8 +12,8 @@ typedef struct queue {
 }QUEUE;
 
 typedef struct bufelem {
-    char *buf;
     char complete;
+    char buf[MAX];
 }BUFELEM;
 
 

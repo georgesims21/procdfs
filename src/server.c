@@ -5,6 +5,7 @@
 #include "reader.h"
 #include "writer.h"
 #include "defs.h"
+#include "queue.h"
 
 /*
  * TODO
@@ -21,6 +22,16 @@
  */
 
 CALLER caller = {0};
+QUEUE *queue = {0};
+
+size_t fdsetlen(int socket_set[]) {
+    size_t count = 0;
+    for(unsigned int i = 0; i < MAX_CLIENTS; i++) {
+        if(socket_set[i] != 0)
+            count++;
+    }
+    return count;
+}
 
 int init_server(int queue_len, struct sockaddr_in *server_add) {
     int opt = 1, socket_fd, r;
@@ -150,6 +161,9 @@ int handle_client(int socket_set[], int sd, int len, unsigned int i, char *line,
     char tmp[MAX] = {0};
     char path[64] = {0};
     int pid = 0;
+    BUFELEM elem = {0};
+    BUFELEM *extracted = {0};
+
     if ((read(sd, line, READ_MAX)) == 0) {
         //Somebody disconnected
         return CLI_DISCONNECT;
@@ -165,14 +179,36 @@ int handle_client(int socket_set[], int sd, int len, unsigned int i, char *line,
             lprintf("{server}[file request]for path \"%s\" received from client(sd){%d}\n",
                     caller.path, caller.fd);
             snprintf(line, strlen(caller.path) + 1, "%s", caller.path);
-            prepend_flag(REQ_MSG_SER, line);
             return CLI_SEND_ALL;
         case CNT_MSG_CLI:
             lprintf("{server}[file content]for path \"%s\" received from client(sd){%d}\n",
-                    caller.path, sd);
-            // could we add to queue here?
-            prepend_flag(FIN_MSG_SER, line);
-            return CLI_SEND_CALLER;
+                    caller.path, sd, line);
+            // we only have 1 server process: can we use last one to do queue work
+            if(caller.fd == sd) {
+                lprintf("{server} caller.fd == sd\n");
+                snprintf(caller.content, strlen(line) + 1, "%s", line);
+            } else {
+                lprintf("{server} caller.fd != sd\n");
+                snprintf(elem.buf, strlen(line) + 1, "%s", line);
+                elem.complete = 0;
+                enqueue(&queue, &elem);
+            }
+//            lprintf("{server} queue len = %d\nfdsetlen = %d\n", lenq(&queue), fdsetlen(socket_set));
+            if(lenq(&queue) == fdsetlen(socket_set) - 1) {
+                // if this loop is the final one for the server, all files must have been received.
+                // Possibility n didn't arrive but problem for the thesis paper. Can't have race cond b/c of
+                // having only 1 process and the fdset. Never reads 2 at once from the set. Think about if
+                // 2 fs' call a read at the same time.
+                lprintf("{server} entered conditional queuelen == socketlen\n");
+                while(lenq(&queue) > 0) {
+                    lprintf("{server} entered while loop\n");
+                    dequeue(&queue);
+                    lprintf("{server} dequeued sucessfully\n");
+                    // concat with caller.content
+                }
+                return CLI_SEND_CALLER;
+            }
+            return END_PROC_SER;
         default:
             break;
     }
@@ -203,6 +239,7 @@ void server_loop(int server_socket, int len, struct sockaddr_in *server_addr) {
                         break;
                     case CLI_SEND_ALL:
                         // requesting the file from all clients but the caller
+                        prepend_flag(REQ_MSG_SER, line);
                         for(unsigned int j = 0; j < MAX_CLIENTS; j++) {
 //                            if(caller.fd == client_socks[j])
 //                                continue;
@@ -211,7 +248,15 @@ void server_loop(int server_socket, int len, struct sockaddr_in *server_addr) {
                         break;
                     case CLI_SEND_CALLER:
                         // send final file to caller
-                        send(caller.fd, line, strlen(line), 0);
+                        // problem, this will be called n times for amount of connected clients
+                        // if
+                        prepend_flag(FIN_MSG_SER, caller.content);
+                        send(caller.fd, caller.content, strlen(caller.content), 0);
+                        memset(&caller, 0, sizeof(caller));
+                        break;
+                    case END_PROC_SER:
+                        // want this process to go back to start of while to listen for more files
+                        lprintf("{server} END_PROC_SER hit\n");
                         break;
                     default:
                         break;

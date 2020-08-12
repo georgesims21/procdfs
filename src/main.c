@@ -48,7 +48,9 @@ int pipecomms[2];
  *  - [x] prepend the path to the file content
  *  - [x] remove the process number
  *  * bugs
- *  - [ ] if typed 'cat <filename>' and then delete a char, main segfaults (seems to be only net/dev)
+ *  - [x] if typed 'cat <filename>' and then delete a char, main segfaults (seems to be only net/dev)
+ *      * was the malloc in read()
+ *      * Can we somehow skip the reading of the file and get res somewhere else?
  */
 
 static void *procsys_init(struct fuse_conn_info *conn,
@@ -218,7 +220,8 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
         return -errno;
 
     int filesize = procsizefd(fd);
-    char *buffer = malloc((filesize * sizeof(char)) + 1);
+//    char *buffer = malloc((filesize * sizeof(char)) + 1);
+    char buffer[MAX] = {0};
     res = pread(fd, buffer, size, offset);
     buffer[filesize + 1] = '\0';
     if (res == -1)
@@ -227,8 +230,10 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
     if(fi == NULL)
         close(fd);
 
-    fetch_from_server(buffer, fpath, buf, NME_MSG_CLI, client_socket, pipecomms[0]);
-    free(buffer);
+//    fetch_from_server(buffer, fpath, buf, NME_MSG_CLI, client_socket, pipecomms[0]);
+//    free(buffer);
+
+    fetch_from_server(fpath, &buf, NME_MSG_CLI, client_socket, pipecomms[0]);
     return res;
 }
 
