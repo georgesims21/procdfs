@@ -46,7 +46,9 @@ int pipecomms[2];
  *  * main
  *  - [ ] error checking to see if read op actually read all of the file
  *  - [x] prepend the path to the file content
- *  - [ ] remove the process number
+ *  - [x] remove the process number
+ *  * bugs
+ *  - [ ] if typed 'cat <filename>' and then delete a char, main segfaults (seems to be only net/dev)
  */
 
 static void *procsys_init(struct fuse_conn_info *conn,
@@ -55,7 +57,6 @@ static void *procsys_init(struct fuse_conn_info *conn,
     (void) conn;
     struct sockaddr_in server_addr;
     int server_socket;
-    sleep(2); // to allow for server to start on run config
     cfg->use_ino = 1;
 
     /* Pick up changes from lower filesystem right away. This is
@@ -105,7 +106,8 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
 
     (void) fi;
     int res;
-    const char *fpath = final_path(path);
+    char fpath[MAX_PATH] = {0};
+    final_path(path, fpath);
 
     res = lstat(fpath, stbuf);
     if (res == -1)
@@ -125,8 +127,10 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
 static int procsys_access(const char *path, int mask) {
 
     int res;
+    char fpath[MAX_PATH] = {0};
+    final_path(path, fpath);
 
-    res = access(final_path(path), mask);
+    res = access(fpath, mask);
     if (res == -1)
         return -errno;
 
@@ -136,8 +140,10 @@ static int procsys_access(const char *path, int mask) {
 static int procsys_readlink(const char *path, char *buf, size_t size) {
 
     int res;
+    char fpath[MAX_PATH] = {0};
+    final_path(path, fpath);
 
-    res = readlink(final_path(path), buf, size - 1);
+    res = readlink(fpath, buf, size - 1);
     if (res == -1)
         return -errno;
 
@@ -151,12 +157,14 @@ static int procsys_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
     DIR *dp;
     struct dirent *de;
+    char fpath[MAX_PATH] = {0};
+    final_path(path, fpath);
 
     (void) offset;
     (void) fi;
     (void) flags;
 
-    dp = opendir(final_path(path));
+    dp = opendir(fpath);
     if (dp == NULL)
         return -errno;
 
@@ -174,19 +182,11 @@ static int procsys_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 }
 
 static int procsys_open(const char *path, struct fuse_file_info *fi) {
-    /*
-     * TODO
-     *  [?] Making this work with the new files -- check if procsys_read() is called during this op,
-     *      if yes then ignore to-do
-     *      - [ ] Must request the file from the server and return the pointer to this
-     *          - [x] Make a method out of the process in read() to update the file to congregated one
-     *          - [ ] Try using procsys_read() before opening
-     *          - [ ] Make a new flag where the file content isn't sent with the flag&path
-     */
 
     int res;
-    const char *fpth = final_path(path);
-    res = openat(AT_FDCWD, fpth, O_RDONLY);
+    char fpath[MAX_PATH] = {0};
+    final_path(path, fpath);
+    res = openat(AT_FDCWD, fpath, O_RDONLY);
     if (res == -1)
         return -errno;
 
@@ -204,12 +204,13 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
 
     int fd;
     int res;
-    char *tmp = (char *)final_path(path);
-    remove_pid(tmp);
-    const char *fp = tmp;
+    char fpath[MAX_PATH] = {0};
+    final_path(path, fpath);
+    remove_pid(fpath);
+//    const char *fp = fpath;
 
     if(fi == NULL)
-        fd = openat(AT_FDCWD, fp, O_RDONLY);
+        fd = openat(AT_FDCWD, fpath, O_RDONLY);
     else {
         fd = fi->fh;
     }
@@ -226,7 +227,7 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
     if(fi == NULL)
         close(fd);
 
-    fetch_from_server(buffer, fp, buf, NME_MSG_CLI, client_socket, pipecomms[0]);
+    fetch_from_server(buffer, fpath, buf, NME_MSG_CLI, client_socket, pipecomms[0]);
     free(buffer);
     return res;
 }
@@ -234,8 +235,10 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
 static int procsys_statfs(const char *path, struct statvfs *stbuf) {
 
     int res;
+    char fpath[MAX_PATH] = {0};
+    final_path(path, fpath);
 
-    res = statvfs(final_path(path), stbuf);
+    res = statvfs(fpath, stbuf);
     if (res == -1)
         return -errno;
 
@@ -253,9 +256,11 @@ static off_t procsys_lseek(const char *path, off_t off, int whence, struct fuse_
 
     int fd;
     off_t res;
+    char fpath[MAX_PATH] = {0};
+    final_path(path, fpath);
 
     if (fi == NULL)
-        fd = open(final_path(path), O_RDONLY);
+        fd = open(fpath, O_RDONLY);
     else
         fd = fi->fh;
 
@@ -271,7 +276,7 @@ static off_t procsys_lseek(const char *path, off_t off, int whence, struct fuse_
     return res;
 }
 
-static const struct fuse_operations procsys_oper = {
+static const struct fuse_operations procsys_ops = {
         .init       = procsys_init,
         .getattr	= procsys_getattr,
         .access		= procsys_access,
@@ -287,5 +292,5 @@ static const struct fuse_operations procsys_oper = {
 int main(int argc, char *argv[]) {
 
     umask(0);
-    return fuse_main(argc, argv, &procsys_oper, NULL);
+    return fuse_main(argc, argv, &procsys_ops, NULL);
 }

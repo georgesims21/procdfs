@@ -39,9 +39,10 @@ void fetch_from_server(char *filebuf, const char *fp, char *buf, int flag, int s
     //               size(bytes):   1    64       n         1
     // where n <= MAX - (MAX_FLAG + MAX_PATH + 1)
 
+    size_t flen = 1, fplen = strlen(fp);
+    int total = MAX_FLAG + MAX_PATH + 1;
     char reply[MAX] = {0};
-    size_t flen = 1, fplen = strlen(fp), total = MAX_FLAG + MAX_PATH + 1;
-    char *tmp = (char *)calloc(0, total * sizeof(char));
+    char tmp[MAX_FLAG + MAX_PATH + 1] = {0}; // using total gives compiler error
 
     //flag
     char fl = flag + '0';
@@ -53,7 +54,6 @@ void fetch_from_server(char *filebuf, const char *fp, char *buf, int flag, int s
     tmp[total] = '\0';
 
     write(serversock, tmp, strlen(tmp));
-    free(tmp);
     read(pipe, &reply, sizeof(reply)); // wait for the final file from reader process
 
     snprintf(buf, strlen(reply), "%s", reply);

@@ -22,7 +22,7 @@ mode_t what_am_i(const char *path);
 struct stat *retstat(const char *path);
 // Given a filepath, fill the buf with its contents
 size_t populate(char **buf, size_t size, off_t offset, const char *path);
-const char *final_path(const char *path);
+void final_path(const char *path, char *buf);
 char **dir_contents(const char *path);
 int dir_size(const char *path);
 int parse_message(char *message);

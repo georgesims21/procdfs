@@ -1,5 +1,6 @@
 #include "fileops.h"
 #include "defs.h"
+#include "log.h"
 #include <limits.h>
 
 int file_exists(const char *pathname) {
@@ -101,13 +102,13 @@ size_t populate(char **buf, size_t size, off_t offset, const char *path) {
     return size;
 }
 
-const char *final_path(const char *path) {
+void final_path(const char *path, char *buf) {
 
 
     size_t len = strlen(proc) + strlen(path);
-    char *final_path = malloc(len + 1);
-    snprintf(final_path, len + 1, "%s%s", proc, path);
-    return final_path;
+    char tmp[MAX_PATH] = {0};
+    snprintf(tmp, len + 1, "%s%s", proc, path);
+    memcpy(buf, tmp, MAX_PATH);
 }
 
 char **dir_contents(const char *path) {
