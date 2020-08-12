@@ -66,11 +66,8 @@ TODO:
       - [ ] 2.3.3: Finish queue logic to work on n machines
     - [ ] 2.4: Congregate some files and run tests with net-tools
     - [ ] 2.5 (extra): Convert it into a secure client-server with openssl libs
- 
-- [ ] 3: **Go from 2 to n multiple clients**   
-      Should be smooth if using multiple vagrant vms as clients to test
 
-- [ ] 4: **Hijacking**   
+- [ ] 3: **Hijacking**   
       Fakeroot pretends that you are root. It will give a different file system
       overview as what's actually there, like a container/VM. Then any command run
       within this fakeroot follows that structure. So could replace /proc with
@@ -79,12 +76,12 @@ TODO:
       Can use strace <command> to see a syscall trace to see what files etc are
       being accessed by that command, this helps with debugging.
 
-    - [ ] 4.1: Use a mix of mount namespaces and chroot
-      - [ ] 4.1.1: Read about [namespaces](https://man7.org/linux/man-pages/man7/namespaces.7.html)
-      - [ ] 4.1.2: Read about [mount namespaces](https://man7.org/linux/man-pages/man7/mount_namespaces.7.html)
-      - [ ] 4.1.3: Read about [chroot](https://man7.org/linux/man-pages/man2/chroot.2.html)
-      - [ ] 4.1.4: Read [tutorial on chroot](https://www.cyberciti.biz/faq/unix-linux-chroot-command-examples-usage-syntax/)
+    - [ ] 3.1: Use a mix of mount namespaces and chroot
+      - [ ] 3.1.1: Read about [namespaces](https://man7.org/linux/man-pages/man7/namespaces.7.html)
+      - [ ] 3.1.2: Read about [mount namespaces](https://man7.org/linux/man-pages/man7/mount_namespaces.7.html)
+      - [ ] 3.1.3: Read about [chroot](https://man7.org/linux/man-pages/man2/chroot.2.html)
+      - [ ] 3.1.4: Read [tutorial on chroot](https://www.cyberciti.biz/faq/unix-linux-chroot-command-examples-usage-syntax/)
       
-- [ ] 5: **Do the same for sysfs**
+- [ ] 4: **Do the same for sysfs**
 
-- [ ] 6: **Benchmarking**
+- [ ] 5: **Benchmarking**
