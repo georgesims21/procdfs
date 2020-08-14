@@ -8,15 +8,10 @@ mkdir <mountdir>
 ```
 
 ## Introduction
-This is the coding project for my CS bachelor thesis, the aim is to recreate procfs and sysfs on a distributed level using the FUSE API.
+This is the coding project for my CS bachelor thesis, the aim is to recreate procfs on a distributed level using the FUSE API.
 
 TODO:   
 - [ ] 1: **Writing a filesystem that will mostly reflect what is in the procfs**
-
-    ~- [ ] 1.1: Create the filesystem datastructures   
-        - [x] 1.1.1: Tree (NODEs) to allow for parent, child and sibling node pointers for traversal, plus directory/file name [tree.c](src/tree.c)   
-        - [x] 1.1.2: Queue to allow for the BFS search [queue.c](src/queue.c)   
-        - [ ] 1.1.3: BFS algorithm~   
 
     - [x] 1.1: Mirror procfs with basic directories and files
 
@@ -25,23 +20,14 @@ TODO:
         - [x] 1.2.2: cat files in procfs == cat files in procsys
 
     - [x] 1.3: Be able to handle standard utility commands like iostat fstat etc
-
-         ~-[x] 1.3.1: Write bash (or c) scripts which replicate these commands to run on this new fs.~   
-        - [x] ' cat /proc/net/dev '       - Packet stats   
-        - [ ] ' cat /proc/net/netstat '   - Tcp stats. First ones are counters   
-        - [ ] ' ifconfig '                - Getting info from above files   
-        - [x] ' ifstat '                  - Periodically reading the files above and subtracting each window to show what has been transmitted per second [packet-bytes](test/ifstat_procsys.sh)   
-        - [ ] ' iftop '     
-        - [ ] ' netstat '   
-        - [ ] Replicate some other networking utilities - [info about proc files (1.4 is networking)](https://www.kernel.org/doc/Documentation/filesystems/proc.txt)    
             
-            - [x] 1.3.2: Modify networking binaries to use this FS instead of /proc for testing purposes
-                - [x] arp
-                - [x] hostname
-                - [x] ifconfig
-                - [x] netstat
-                - [x] rarp
-                - [x] route
+        - [x] 1.3.1: Modify networking binaries to use this FS instead of /proc for testing purposes
+            - [x] arp
+            - [x] hostname
+            - [x] ifconfig
+            - [x] netstat
+            - [x] rarp
+            - [x] route
 
     - [ ] 1.4 (extra): Fix bottleneck in the getattrb operation
         - Due to proc files being 0 size, if you don't manually get the size and save it in the stat struct then no cat commands print. BUT this introduces huge bottleneck when ls'ing all contents
@@ -62,8 +48,7 @@ TODO:
     - [x] 2.3: Merge logic into filesystem
       - [x] 2.3.1: First model should use server to do all work and comms between clients
           - [plan](doc/networking-read()call-flowchart.pdf)
-      - [x] 2.3.2: Second model should have all fs' as servers and clients to each other
-      - [ ] 2.3.3: Finish queue logic to work on n machines
+      - [] 2.3.2: Second model should have all fs' as servers and clients to each other
     - [ ] 2.4: Congregate some files and run tests with net-tools
     - [ ] 2.5 (extra): Convert it into a secure client-server with openssl libs
 
@@ -81,7 +66,5 @@ TODO:
       - [ ] 3.1.2: Read about [mount namespaces](https://man7.org/linux/man-pages/man7/mount_namespaces.7.html)
       - [ ] 3.1.3: Read about [chroot](https://man7.org/linux/man-pages/man2/chroot.2.html)
       - [ ] 3.1.4: Read [tutorial on chroot](https://www.cyberciti.biz/faq/unix-linux-chroot-command-examples-usage-syntax/)
-      
-- [ ] 4: **Do the same for sysfs**
 
-- [ ] 5: **Benchmarking**
+- [ ] 4: **Benchmarking**
