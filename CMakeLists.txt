@@ -12,6 +12,9 @@ set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/CMakeModules/")
 #        src/writer.h src/reader.c
 #        src/reader.h src/queue.h
 #        src/queue.c src/defs.h)
+
+add_executable(server_new
+        src/server_new.c src/server_new.h)
 add_executable(procsys
         src/main.c src/fileops.c
         src/fileops.h src/client.c
@@ -62,7 +65,7 @@ add_executable(client
         src/reader.h src/writer.c
         src/writer.h src/queue.c
         src/queue.h src/defs.h)
-add_executable(testing src/testing.c src/testing.h src/testing2.c src/testing2.h src/defs.h)
+add_executable(testing src/testing.c src/log.c src/log.h)
 
 set(CMAKE_C_FLAGS "-D_FILE_OFFSET_BITS=64 -lfuse3")
 
@@ -83,5 +86,8 @@ endif()
 
 target_link_libraries(${PROJECT_NAME}
         ${LIBFUSE_LIBRARIES}
+        pthread
+        )
+target_link_libraries(server_new
         pthread
         )
