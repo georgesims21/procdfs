@@ -15,17 +15,13 @@ typedef struct address {
  * requests. For host machine requests see client.c
  */
 
-int init_server(Address *address, int queue_length, int port_number);
+int init_server(Address *address, int queue_length, int port_number, const char *interface);
 /*
  * init server: - by main thread
  *  @param  queue length - given as argv to filesystem
  *          Address *server_addr
  *  @ret    error codes - print errors to log file too
  *
- *  TODO
- *      fetch IP of machine
- *      - search for interface name directly instead of going through all?
- *      - point that to the addr in struct
  *  make server socket into actual socket
  *  fill server address struct with IP information, socket and length
  *  bind the socket and Address->sockaddr_in->... struct
@@ -33,10 +29,12 @@ int init_server(Address *address, int queue_length, int port_number);
  */
 
 
-struct connect_to_IPs_args {
+struct connect_to_file_IPs_args {
+    // understand passing arrays with/out as pointers is the same, server_addr is without * to
+    // ensure it is not modified and that a local copy should be made
     Address *conn_clients; pthread_mutex_t *conn_clients_lock;
     Address *host_client; pthread_mutex_t *host_client_lock;
-    Address *client_host;
+    Address *client_host; pthread_mutex_t *client_host_lock;
     Address server_addr;
     int arrlen;
 };
@@ -51,7 +49,7 @@ struct connect_to_IPs_args {
  *      int arrlen; // they should all be the same size
  * };
  */
-void *connect_to_IPs(void *arg);
+void *connect_to_file_IPs(void *arg);
 /*
  * connect to IPs: - by main thread 0
  *  @param  void* - pass connIPs_args struct
@@ -59,19 +57,27 @@ void *connect_to_IPs(void *arg);
  *
  *  file pointer to IP file
  *  loop to read line by line each IP:
- * TODO
  *      ignore own
- *      create int sock
  *      fill in client_add struct with extracted IP and port (mindmap has details)
- *      connect this socket to the server_add
- *      read a response to assume connection
  *      create new address struct with server_add and add an fd number (socket) and len
  *      if not contained in the hostclient[] add it (don't append, find first empty spot)
  *      if also contained in the clienthost[] then add to connectedclients[] (ditto)
  *  exit thread
- *
+ * TODO
+ *      * how to find port number from IP?
+ *      * test the if free < 0 part
+ *      * connect this socket to the IP - comms need testing
+ *      * more secure string checking on the file (remove whitespace etc)
  */
+static int fetch_IP(Address *addr, const char *interface);
+static int next_space(Address *addr, int addrlen);
+static int pconnect(Address *addrarr, int arrlen, in_addr_t conn);
+static int contained_within(Address *addr, Address lookup, int arrlen);
 
+struct server_loop_args {
+    Address server_addr;
+
+};
 /*
  * struct server_loops_args {
  * // don't need to be pointers because they won't change
