@@ -4,11 +4,38 @@
 #include <glob.h>
 #include <netinet/in.h>
 
+#define MAXPATH 64
+
 typedef struct address {
     int sock;
     size_t addr_len;
     struct sockaddr_in addr;
 }Address;
+
+typedef struct request {
+    Address sender;
+    char received;
+    int atomic_counter;
+    char path[MAXPATH];
+    char buf[]; // to allow for flexible array member
+}Request;
+
+typedef struct request_tracker_ll {
+    Request *req; // may need to be pointer
+    struct request_tracker_ll *next;
+}Request_tracker_ll;
+
+typedef struct inprog {
+    int atomic_counter;
+    int messages_sent;
+    char complete;
+    Request_tracker_ll *req_ll_head; // head of linked list of the machines who got message
+}Inprog;
+
+typedef struct inprog_tracker_ll {
+    Inprog *inprg;
+    struct inprog_tracker_ll *next;
+}Inprog_tracker_ll;
 
 /*
  * Used to deal with any requests from other machines. Including file content
