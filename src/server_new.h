@@ -69,8 +69,15 @@ static int next_space(Address *addr, int addrlen);
 static int pconnect(Address *addrarr, int arrlen, in_addr_t conn);
 static int contained_within(Address *addr, Address lookup, int arrlen);
 
+static int add_address(Address *arr, Address addr, pthread_mutex_t *arr_lock, int arrlen);
+
 struct server_loop_args {
+    Address *conn_clients; pthread_mutex_t *conn_clients_lock;
+    Address *host_client; pthread_mutex_t *host_client_lock;
+    Address *client_host; pthread_mutex_t *client_host_lock;
+    Inprog *inprog; pthread_mutex_t *inprog_lock;
     Address server_addr;
+    int arrlen;
 
 };
 /*
@@ -92,6 +99,7 @@ struct server_loop_args {
  *      add sockets from connected clients[] - can extract the int sock
  *      listen to fdset
  *      noise on master:
+ * TODO
  *          accept_connection()
  *      handle_client()-remove
  *      noise on fdset:

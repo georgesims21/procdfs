@@ -11,6 +11,7 @@
 #include <pthread.h>
 
 #include "server_new.h"
+#include "ds_new.h"
 
 int init_server(Address *address, int queue_length, int port_number, const char *interface) {
 
@@ -129,6 +130,12 @@ static int contained_within(Address *addr, Address lookup, int arrlen) {
 void *connect_to_file_IPs(void *arg) {
 
     struct connect_to_file_IPs_args *args = (struct connect_to_file_IPs_args *) arg;
+
+    printf("[conn2IP] host_addr: %p\n",(void*)&args->server_addr);
+    printf("[conn2IP] connected_clients: %p\n",(void*)&args->conn_clients);
+    printf("[conn2IP] host_client: %p\n",(void*)&args->host_client);
+    printf("[conn2IP] client_host: %p\n",(void*)&args->client_host);
+
     Address host_addr = args->server_addr;
     const char *filename = "iplist.txt";
     char line[32]; // 32 bits for ipv4 address
@@ -187,6 +194,71 @@ void *connect_to_file_IPs(void *arg) {
     pthread_exit(0);
 }
 
+static int listen_fds(fd_set *fdset, Address host_addr, Address conn_clients[], int arrlen) {
+
+    int maxsd = 0;
+    FD_ZERO(fdset);
+    FD_SET(host_addr.sock, fdset);
+    for(unsigned int i = 0; i < arrlen; i++) {
+        int tmp = conn_clients[i].sock;
+        if(tmp > 0)
+            FD_SET(tmp, fdset);
+        if(tmp > maxsd)
+            maxsd = tmp;
+    }
+    return maxsd;
+}
+
+static int add_address(Address *arr, Address addr, pthread_mutex_t *arr_lock, int arrlen){
+
+    if(contained_within(arr, addr, arrlen) == 0) {
+        printf("Address already in!\n");
+        return -1;
+    }
+    pthread_mutex_lock(arr_lock);
+    int free_space;
+    if((free_space = next_space(arr, arrlen)) < 0) {
+        printf("Array full!\n");
+        return -1;
+    }
+    arr[free_space] = addr;
+    pthread_mutex_unlock(arr_lock);
+    return 0;
+}
+
+static void accept_connection(Address host_addr, Address *client_addr) {
+
+    client_addr->addr_len = sizeof(client_addr->addr);
+
+    if ((client_addr->sock = accept(host_addr.sock, (struct sockaddr *)&client_addr->addr,
+            (socklen_t *)&client_addr->addr_len)) < 0) {
+        perror("accept");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void *server_loop(void *arg) {
+
+    struct server_loop_args *args = (struct server_loop_args *)arg;
+    Address host_addr = args->server_addr;
+    fd_set fdset;
+    int sd = 0, maxsd = 0;
+
+    for(;;) {
+        // dirty reads not important because next loop we will add them instead
+        maxsd = listen_fds(&fdset, host_addr, args->conn_clients, args->arrlen);
+        if (FD_ISSET(host_addr.sock, &fdset)) {
+            Address new_client;
+            memset(&new_client, 0, sizeof(Address));
+            accept_connection(host_addr, &new_client);
+            // add new connection to client_host array
+            add_address(args->client_host, new_client, args->client_host_lock, args->arrlen);
+            // if also in hostclient array, add to connected clients
+            if(contained_within(args->host_client, new_client, args->arrlen))
+                add_address(args->conn_clients, new_client, args->conn_clients_lock, args->arrlen);
+        }
+    }
+}
 
 int main(int argc, char *argv[]) {
 
@@ -206,23 +278,33 @@ int main(int argc, char *argv[]) {
     int portnr = (int)pnr;
 
     Address host_addr = {0, 0, {0}};
+    printf("[main] host_addr: %p\n",(void*)&host_addr);
+
 
     init_server(&host_addr, nrmachines, portnr, infc);
 
     // init Address arrays and their corresponding mutex locks
     Address connected_clients[nrmachines];
+    printf("[main] connected_clients: %p\n",(void*)&connected_clients);
     memset(connected_clients, 0, sizeof(Address) * (nrmachines));
     pthread_mutex_t connected_clients_lock = PTHREAD_MUTEX_INITIALIZER;;
 
 //    memcpy(&connected_clients, &host_addr, sizeof(Address));
 
     Address host_client[nrmachines];
+    printf("[main] host_client: %p\n",(void*)&host_client);
     memset(host_client, 0, sizeof(Address) * (nrmachines));
     pthread_mutex_t host_client_lock = PTHREAD_MUTEX_INITIALIZER;
 
     Address client_host[nrmachines];
+    printf("[main] client_host: %p\n",(void*)&client_host);
     memset(client_host, 0, sizeof(Address) * (nrmachines));
     pthread_mutex_t client_host_lock = PTHREAD_MUTEX_INITIALIZER;
+
+    Inprog *inprog = (Inprog *)malloc(sizeof(Inprog));
+    printf("[main] inprog: %p\n",(void*)&inprog);
+    memset(inprog, 0, sizeof(Inprog));
+    pthread_mutex_t inprog_lock = PTHREAD_MUTEX_INITIALIZER;
 
 //    for(int i = 0; i < 1; i++) {
 //        host_client[i].sock = i + 1;
@@ -233,8 +315,31 @@ int main(int argc, char *argv[]) {
                                         host_client, &host_client_lock,
                                         client_host, &client_host_lock,
                                         host_addr, nrmachines};
-    pthread_t tid;
-    pthread_create(&tid, NULL, connect_to_file_IPs, &ctipa);
-    pthread_join(tid, NULL);
+    pthread_t ctipa_thread;
+    pthread_create(&ctipa_thread, NULL, connect_to_file_IPs, &ctipa);
+    pthread_join(ctipa_thread, NULL);
+
+    struct server_loop_args sla = {connected_clients, &connected_clients_lock,
+                                   host_client, &host_client_lock,
+                                   client_host, &client_host_lock,
+                                   inprog, &inprog_lock,
+                                   host_addr, nrmachines};
+    pthread_t sla_thread;
+    pthread_create(&sla_thread, NULL, server_loop, &sla);
+    pthread_join(sla_thread, NULL);
+
+// ----- usage of new ds' ------
+//    Request *req = (Request *)malloc(sizeof(Request));
+//    memset(req, 0, sizeof(Request));
+//    Inprog *inprog = (Inprog *)malloc(sizeof(Inprog));
+//    memset(inprog, 0, sizeof(Inprog));
+//    req_tracker_ll_add(&inprog->req_ll_head, req);
+//    req_tracker_ll_print(&inprog->req_ll_head);
+//    char *tmp = "This is the new buffer content!";
+//    if(req_add_content(&inprog->req_ll_head, *req, tmp, strlen(tmp) + 1) < 0) {
+//        printf("Unable to find Request\n");
+//    }
+//    inprog_reset(inprog);
+
     return 0;
 }
