@@ -131,11 +131,6 @@ void *connect_to_file_IPs(void *arg) {
 
     struct connect_to_file_IPs_args *args = (struct connect_to_file_IPs_args *) arg;
 
-    printf("[conn2IP] host_addr: %p\n",(void*)&args->server_addr);
-    printf("[conn2IP] connected_clients: %p\n",(void*)&args->conn_clients);
-    printf("[conn2IP] host_client: %p\n",(void*)&args->host_client);
-    printf("[conn2IP] client_host: %p\n",(void*)&args->client_host);
-
     Address host_addr = args->server_addr;
     const char *filename = "iplist.txt";
     char line[32]; // 32 bits for ipv4 address
@@ -285,24 +280,20 @@ int main(int argc, char *argv[]) {
 
     // init Address arrays and their corresponding mutex locks
     Address connected_clients[nrmachines];
-    printf("[main] connected_clients: %p\n",(void*)&connected_clients);
     memset(connected_clients, 0, sizeof(Address) * (nrmachines));
     pthread_mutex_t connected_clients_lock = PTHREAD_MUTEX_INITIALIZER;;
 
 //    memcpy(&connected_clients, &host_addr, sizeof(Address));
 
     Address host_client[nrmachines];
-    printf("[main] host_client: %p\n",(void*)&host_client);
     memset(host_client, 0, sizeof(Address) * (nrmachines));
     pthread_mutex_t host_client_lock = PTHREAD_MUTEX_INITIALIZER;
 
     Address client_host[nrmachines];
-    printf("[main] client_host: %p\n",(void*)&client_host);
     memset(client_host, 0, sizeof(Address) * (nrmachines));
     pthread_mutex_t client_host_lock = PTHREAD_MUTEX_INITIALIZER;
 
     Inprog *inprog = (Inprog *)malloc(sizeof(Inprog));
-    printf("[main] inprog: %p\n",(void*)&inprog);
     memset(inprog, 0, sizeof(Inprog));
     pthread_mutex_t inprog_lock = PTHREAD_MUTEX_INITIALIZER;
 
