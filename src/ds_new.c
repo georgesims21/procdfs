@@ -113,23 +113,18 @@ int request_ll_free(Request_tracker_node **head) {
         return -1;
     }
     while(reqptr != NULL) {
+        if(reqptr->req != NULL) {
+            free(reqptr->req);
+        }
         next = reqptr->next;
-        reqptr->next = NULL;
         free(reqptr);
-        printf("Request freed!\n");
         reqptr = next;
     }
     return 0;
 }
 
-void inprog_free(Inprog *inp) {
+void inprog_reset(Inprog *inp) {
 
-    Request_tracker_node *reqptr = inp->req_ll_head;
-    while(reqptr->req != NULL) {
-        Request_tracker_node *next = reqptr->next;
-        free(reqptr->req);
-        reqptr->next = NULL;
-        reqptr = next;
-    }
-    free(inp);
+    request_ll_free(&inp->req_ll_head);
+    memset(inp, 0, sizeof(Inprog));
 }

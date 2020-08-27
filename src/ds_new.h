@@ -45,5 +45,9 @@ int req_add_content(Request_tracker_node **head, Request req, char *cnt, int cnt
 Request_tracker_node *req_tracker_ll_fetch(Request_tracker_node **head, Request req);
 void inprog_free(Inprog *inp);
 int request_ll_free(Request_tracker_node **head);
+/* To allow reuse of one request structure, before needing to implement
+ * the inprog tracker linked list at a later time
+ */
+void inprog_reset(Inprog *inp);
 
 #endif //PROCSYS_DS_NEW_H
