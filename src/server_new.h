@@ -30,20 +30,10 @@ struct connect_to_file_IPs_args {
     Address *conn_clients; pthread_mutex_t *conn_clients_lock;
     Address *host_client; pthread_mutex_t *host_client_lock;
     Address *client_host; pthread_mutex_t *client_host_lock;
-    Address server_addr;
+    Address host_addr;
     int arrlen;
+    const char *filename;
 };
-/*
- * struct connect_to_IPs_args {
- *      mutex_lock_t connected_clients_lock;
- *      address *connected_clients[];
- *      mutex_lock_t host_client_lock;
- *      address *host_client[];
- *      address client_host[]; // no modify = no pointer
- *      address server_addr;
- *      int arrlen; // they should all be the same size
- * };
- */
 void *connect_to_file_IPs(void *arg);
 /*
  * connect to IPs: - by main thread 0
@@ -76,19 +66,10 @@ struct server_loop_args {
     Address *host_client; pthread_mutex_t *host_client_lock;
     Address *client_host; pthread_mutex_t *client_host_lock;
     Inprog *inprog; pthread_mutex_t *inprog_lock;
-    Address server_addr;
+    Address host_addr;
     int arrlen;
-
 };
-/*
- * struct server_loops_args {
- * // don't need to be pointers because they won't change
- *      Address server_addr;
- *      mutex_lock_t inprog_tracker_ll_lock;
- *      int *inpr_ll_ptr; // head of Inprog_tracker_ll
- *  };
- */
-
+void *server_loop(void *arg);
 /*
  * server loop: - by server thread
  * @param   void* - pass server_loop_args struct
@@ -101,6 +82,11 @@ struct server_loop_args {
  *      noise on master:
  * TODO
  *          accept_connection()
+ *          BUG
+ *          need to make sure it is being added to host_client correctly or if search methods are
+ *          correctly identifying whether an address is within an array. Maybe can be changed to
+ *          search for an IP rather than all elements of an address (maybe socket changed?)
+ *
  *      handle_client()-remove
  *      noise on fdset:
  *          client disconnect:
@@ -126,16 +112,14 @@ struct server_loop_args {
  *
  */
 
-/*
- * struct accept_connection_args {
- *      mutex_lock_t connected_clients_lock;
- *      address *connected_clients[];
- *      mutex_lock_t client_host_lock;
- *      address *client_host[];
- *      address host_client[]; // no modify = no pointer
- *      int server_sock;
- * };
- */
+struct accept_connection_args {
+    Address *conn_clients; pthread_mutex_t *conn_clients_lock;
+    Address *host_client; pthread_mutex_t *host_client_lock;
+    Address *client_host; pthread_mutex_t *client_host_lock;
+    Address host_addr;
+    int arrlen;
+};
+
 
 /*
  * STATIC accept_connection - by server thread n

@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <pthread.h>
+#include <unistd.h>
 
 #include "server_new.h"
 #include "ds_new.h"
@@ -39,6 +40,7 @@ int init_server(Address *address, int queue_length, int port_number, const char 
     }
 
     listen(address->sock, queue_length);
+    printf("Listening on :%u\n", address->addr.sin_addr.s_addr);
     return 0;
 }
 
@@ -76,26 +78,36 @@ static int fetch_IP(Address *addr, const char *interface) {
 
 static int pconnect(Address *addrarr, int arrlen, in_addr_t conn) {
     int free = 0;
+    Address tmp;
+    tmp.addr.sin_family = AF_INET;
+    tmp.addr.sin_port = htons(1234); // using generic port here, find solution
+    tmp.addr.sin_addr.s_addr = conn;
+    tmp.addr_len = sizeof(tmp.addr);
+    if(contained_within(addrarr, tmp, arrlen) == 0) {
+        printf("Address already inside array");
+        return -1;
+    }
     free = next_space(addrarr, arrlen);
     if(free < 0) {
         printf("Maximum number of machines reached (%d), not adding!\n", arrlen);
         return -1;
     }
-    Address *ptr = addrarr + free; // Address array
+
+    Address *ptr = &addrarr[free]; // Address array
     ptr->addr.sin_family = AF_INET;
     ptr->addr.sin_port = htons(1234); // using generic port here, find solution
     ptr->addr.sin_addr.s_addr = conn;
     ptr->addr_len = sizeof(ptr->addr);
 
-    printf("Added %d to list at %d\n", ptr->sock, free);
     if((ptr->sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("socket\n");
         exit(EXIT_FAILURE);
     }
     if(connect(ptr->sock, (struct sockaddr*)&ptr->addr, ptr->addr_len) < 0) {
-        perror("connect");
-        exit(EXIT_FAILURE);
+    	printf("Cannot connect to %d \n", ptr->sock);
+    	return -2;
     }
+    printf("Added %u to list at %d and connected\n", ptr->addr.sin_addr.s_addr, free);
     return free;
 }
 
@@ -130,9 +142,7 @@ static int contained_within(Address *addr, Address lookup, int arrlen) {
 void *connect_to_file_IPs(void *arg) {
 
     struct connect_to_file_IPs_args *args = (struct connect_to_file_IPs_args *) arg;
-
-    Address host_addr = args->server_addr;
-    const char *filename = "iplist.txt";
+    const char *filename = args->filename;
     char line[32]; // 32 bits for ipv4 address
     in_addr_t conn;
 
@@ -142,27 +152,32 @@ void *connect_to_file_IPs(void *arg) {
         exit(EXIT_FAILURE);
     }
     while(fgets(line, sizeof(line), file)) {
-        // check for empty lines
+        // empty line
         if(strncmp(line, "\n", 1) == 0)
             continue;
         conn = inet_addr(line);
         // if host IP skip
-//        if(conn == host_addr.addr.sin_addr.s_addr) {
-//            printf("Found host IP on list, skipping..\n");
-//            continue;
-//        }
+        if(conn == args->host_addr.addr.sin_addr.s_addr) {
+            printf("Found host IP on list, skipping..\n");
+            // host is included in max machines count
+            continue;
+        }
         // find empty space in host-cli array and assign this IPs info to it
         pthread_mutex_lock(args->host_client_lock);
         // start of critical region 1
         int hcarrloc = pconnect(args->host_client, args->arrlen, conn);
+        if(hcarrloc < 0 ) {
+            // not added due to already existing, array full or couldn't connect
+            continue;
+        }
         Address newaddr = args->host_client[hcarrloc];
         // end of critical region 1
         pthread_mutex_unlock(args->host_client_lock);
 
         pthread_mutex_lock(args->client_host_lock);
         // start of critical region 2
-        if(contained_within(args->client_host, newaddr, args->arrlen) == 0) {
-            printf("contained within client_host array, not adding to connected_clients\n");
+        if(contained_within(args->client_host, newaddr, args->arrlen) != 0) {
+            printf("Not contained within client_host array, not adding to conn_clients\n");
             pthread_mutex_unlock(args->client_host_lock);
             continue;
         }
@@ -171,24 +186,41 @@ void *connect_to_file_IPs(void *arg) {
         pthread_mutex_unlock(args->client_host_lock);
 
         pthread_mutex_lock(args->conn_clients_lock);
-        // start of critical region 2
+        // start of critical region 3
         int ccarrloc = next_space(args->conn_clients, args->arrlen);
-
         if(contained_within(args->conn_clients, newaddr, args->arrlen) == 0) {
             printf("already inside conn_clients\n");
             pthread_mutex_unlock(args->conn_clients_lock);
             continue;
         }
         args->conn_clients[ccarrloc] = newaddr; // is this safe?
+        // end of critical region 3
         pthread_mutex_unlock(args->conn_clients_lock);
-        // end of critical region 2
-
     }
-
     fclose(file);
     pthread_exit(0);
 }
 
+int search_IPs(in_addr_t conn, char *filename) {
+
+    char line[32]; // 32 bits for ipv4 address
+    in_addr_t newconn;
+    FILE* file = fopen(filename, "r");
+    if((file < 0)) {
+        perror("fopen");
+        exit(EXIT_FAILURE);
+    }
+    while(fgets(line, sizeof(line), file)) {
+        // empty line
+        if(strncmp(line, "\n", 1) == 0)
+            continue;
+        newconn = inet_addr(line);
+        if(newconn == conn)
+            return 0;
+    }
+    fclose(file);
+    return -1;
+}
 static int listen_fds(fd_set *fdset, Address host_addr, Address conn_clients[], int arrlen) {
 
     int maxsd = 0;
@@ -218,6 +250,7 @@ static int add_address(Address *arr, Address addr, pthread_mutex_t *arr_lock, in
     }
     arr[free_space] = addr;
     pthread_mutex_unlock(arr_lock);
+    printf("Address added\n");
     return 0;
 }
 
@@ -230,52 +263,86 @@ static void accept_connection(Address host_addr, Address *client_addr) {
         perror("accept");
         exit(EXIT_FAILURE);
     }
+    printf("Accepted connection\n");
+}
+
+void *new_connection(void *arg) {
+
+    struct accept_connection_args *args = (struct accept_connection_args *) arg;
+    Address new_client;
+    memset(&new_client, 0, sizeof(Address));
+    accept_connection(args->host_addr, &new_client);
+    // add new connection to client_host array
+    add_address(args->client_host, new_client, args->client_host_lock, args->arrlen);
+    // if also in hostclient array, add to connected clients
+    if(contained_within(args->host_client, new_client, args->arrlen) < 0) {
+        printf("Not contained within host client array\n");
+        // check if IP matches one from file, if yes pconnect
+       if(search_IPs(new_client.addr.sin_addr.s_addr, "iplist.txt") == 0) {
+           printf("IP is contained within the iplist file, safe to add\n");
+           pconnect(args->host_client, args->arrlen, new_client.addr.sin_addr.s_addr);
+       }
+    }
+    add_address(args->conn_clients, new_client, args->conn_clients_lock, args->arrlen);
+    printf("Client :%u has been added to connected clients array!\n", new_client.addr.sin_addr.s_addr);
+    pthread_exit(0);
 }
 
 void *server_loop(void *arg) {
 
     struct server_loop_args *args = (struct server_loop_args *)arg;
-    Address host_addr = args->server_addr;
     fd_set fdset;
     int sd = 0, maxsd = 0;
 
     for(;;) {
         // dirty reads not important because next loop we will add them instead
-        maxsd = listen_fds(&fdset, host_addr, args->conn_clients, args->arrlen);
-        if (FD_ISSET(host_addr.sock, &fdset)) {
-            Address new_client;
-            memset(&new_client, 0, sizeof(Address));
-            accept_connection(host_addr, &new_client);
-            // add new connection to client_host array
-            add_address(args->client_host, new_client, args->client_host_lock, args->arrlen);
-            // if also in hostclient array, add to connected clients
-            if(contained_within(args->host_client, new_client, args->arrlen))
-                add_address(args->conn_clients, new_client, args->conn_clients_lock, args->arrlen);
+        maxsd = listen_fds(&fdset, args->host_addr, args->conn_clients, args->arrlen);
+        if (FD_ISSET(args->host_addr.sock, &fdset)) {
+            // new connection
+            struct accept_connection_args aca = {args->conn_clients, args->conn_clients_lock,
+                                           args->host_client, args->host_client_lock,
+                                           args->client_host, args->client_host_lock,
+                                           args->host_addr, args->arrlen};
+            pthread_t aca_thread;
+            pthread_create(&aca_thread, NULL, new_connection, &aca);
+            pthread_join(aca_thread, NULL);
+        }
+        for(unsigned int i = 0; i < args->arrlen; i++) {
+            sd = args->conn_clients[i].sock;
+            if(FD_ISSET(sd, &fdset)) {
+                // else something written by a connected client
+                printf("Something was written/disconnected\n");
+                char buf[15] = {0};
+                if ((read(sd, buf, 1)) == 0) {
+                    //Somebody disconnected
+                    printf("Client disconnected!\n");
+                } else {
+                    printf("Buf receieved: %s\n", buf);
+                }
+            }
         }
     }
 }
 
 int main(int argc, char *argv[]) {
 
-    if(argc < 3) {
-        printf("Not enough arguments given, 3 expected: max-clients port-number interface-name\n");
+    if(argc < 4) {
+        printf("Not enough arguments given, 3 expected: total-machines port-number interface-name ipfile\n");
         exit(EXIT_FAILURE);
     }
     long nrm = strtol(argv[1], NULL, 10);
     long pnr = strtol(argv[2], NULL, 10);
     const char *infc = argv[3];
+    const char *fn = argv[4];
     // Check if returned error from strtol OR if the longs are too large to convert
     if (errno != 0 || ((nrm > INT_MAX) || (pnr > INT_MAX ))) {
         printf("%s argument too large!\n", (nrm > INT_MAX) ? "first" : "second");
         exit(EXIT_FAILURE);
     }
-    int nrmachines = (int)nrm;
+    int nrmachines = (int)nrm - 1; // to account for this machine (not adding to connected clients)
     int portnr = (int)pnr;
 
     Address host_addr = {0, 0, {0}};
-    printf("[main] host_addr: %p\n",(void*)&host_addr);
-
-
     init_server(&host_addr, nrmachines, portnr, infc);
 
     // init Address arrays and their corresponding mutex locks
@@ -305,7 +372,7 @@ int main(int argc, char *argv[]) {
     struct connect_to_file_IPs_args ctipa = {connected_clients, &connected_clients_lock,
                                         host_client, &host_client_lock,
                                         client_host, &client_host_lock,
-                                        host_addr, nrmachines};
+                                        host_addr, nrmachines, fn};
     pthread_t ctipa_thread;
     pthread_create(&ctipa_thread, NULL, connect_to_file_IPs, &ctipa);
     pthread_join(ctipa_thread, NULL);
@@ -317,7 +384,16 @@ int main(int argc, char *argv[]) {
                                    host_addr, nrmachines};
     pthread_t sla_thread;
     pthread_create(&sla_thread, NULL, server_loop, &sla);
-    pthread_join(sla_thread, NULL);
+//    pthread_join(sla_thread, NULL);
+
+    sleep(1);
+    for(;;) {
+        char input[32] = {0};
+        printf("~ ");
+        scanf("%s", input);
+        write(connected_clients[0].sock, input, 32);
+    }
+
 
 // ----- usage of new ds' ------
 //    Request *req = (Request *)malloc(sizeof(Request));
