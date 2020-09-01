@@ -112,12 +112,13 @@ void *server_loop(void *arg);
  *
  */
 
-struct accept_connection_args {
+struct new_connection_args {
     Address *conn_clients; pthread_mutex_t *conn_clients_lock;
     Address *host_client; pthread_mutex_t *host_client_lock;
     Address *client_host; pthread_mutex_t *client_host_lock;
     Address host_addr;
-    int arrlen;
+    int arrlen; int *fdcount;
+    struct pollfd *pfds; pthread_mutex_t *pfds_lock;
 };
 
 
