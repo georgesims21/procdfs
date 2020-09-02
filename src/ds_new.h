@@ -8,7 +8,8 @@
 #define MAXPATH 64
 
 typedef struct address {
-    int sock;
+    int sock_in; // host will use sock_in only
+    int sock_out;
     size_t addr_len;
     struct sockaddr_in addr;
 }Address;

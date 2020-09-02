@@ -28,8 +28,6 @@ struct connect_to_file_IPs_args {
     // understand passing arrays with/out as pointers is the same, server_addr is without * to
     // ensure it is not modified and that a local copy should be made
     Address *conn_clients; pthread_mutex_t *conn_clients_lock;
-    Address *host_client; pthread_mutex_t *host_client_lock;
-    Address *client_host; pthread_mutex_t *client_host_lock;
     Address host_addr;
     int arrlen;
     const char *filename;
@@ -56,18 +54,17 @@ void *connect_to_file_IPs(void *arg);
  */
 static int fetch_IP(Address *addr, const char *interface);
 static int next_space(Address *addr, int addrlen);
-static int pconnect(Address *addrarr, int arrlen, in_addr_t conn);
+static int pconnect(Address *addrarr, int arrlen, Address *newaddr);
 static int contained_within(Address *addr, Address lookup, int arrlen);
 
 static int add_address(Address *arr, Address addr, pthread_mutex_t *arr_lock, int arrlen);
 
 struct server_loop_args {
     Address *conn_clients; pthread_mutex_t *conn_clients_lock;
-    Address *host_client; pthread_mutex_t *host_client_lock;
-    Address *client_host; pthread_mutex_t *client_host_lock;
     Inprog *inprog; pthread_mutex_t *inprog_lock;
     Address host_addr;
     int arrlen;
+    const char *filename;
 };
 void *server_loop(void *arg);
 /*
@@ -114,11 +111,10 @@ void *server_loop(void *arg);
 
 struct new_connection_args {
     Address *conn_clients; pthread_mutex_t *conn_clients_lock;
-    Address *host_client; pthread_mutex_t *host_client_lock;
-    Address *client_host; pthread_mutex_t *client_host_lock;
     Address host_addr;
     int arrlen; int *fdcount;
     struct pollfd *pfds; pthread_mutex_t *pfds_lock;
+    const char *filename;
 };
 
 

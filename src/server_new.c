@@ -11,18 +11,44 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <poll.h>
-
+#include <time.h>
+#include <sys/time.h>
+#include <math.h>
+#include <sys/types.h>
+#include <sys/syscall.h>
 #include "server_new.h"
 #include "ds_new.h"
 
+char tb[26];
+
+void get_time(char *buf) {
+    memset(tb, 0, sizeof(tb));
+    int millisec;
+    struct tm* tm_info;
+    struct timeval tv;
+    char buffer[26];
+    gettimeofday(&tv, NULL);
+
+    millisec = lrint(tv.tv_usec/1000.0); // Round to nearest millisec
+    if (millisec>=1000) { // Allow for rounding up to nearest second
+        millisec -=1000;
+        tv.tv_sec++;
+    }
+
+    tm_info = localtime(&tv.tv_sec);
+
+    strftime(buffer, 26, "%M:%S", tm_info);
+    sprintf(buf, "%s.%03d", buffer, millisec);
+}
+
 int init_server(Address *address, int queue_length, int port_number, const char *interface) {
 
-    if((address->sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+    if((address->sock_in = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("socket\n");
         exit(EXIT_FAILURE);
     }
 
-    if(setsockopt(address->sock, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) < 0) {
+    if(setsockopt(address->sock_in, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) < 0) {
         perror("setsockopt");
         exit(EXIT_FAILURE);
     }
@@ -35,13 +61,15 @@ int init_server(Address *address, int queue_length, int port_number, const char 
     }
     address->addr_len = sizeof(address->addr);
 
-    if(bind(address->sock, (struct sockaddr*)&address->addr, address->addr_len) < 0) {
+    if(bind(address->sock_in, (struct sockaddr*)&address->addr, address->addr_len) < 0) {
         perror("bind");
         exit(EXIT_FAILURE);
     }
 
-    listen(address->sock, queue_length);
-    printf("Listening on :%s at port: %d\n", inet_ntoa(address->addr.sin_addr), htons(address->addr.sin_port));
+    listen(address->sock_in, queue_length);
+    get_time(tb);
+    printf("[thread: %ld {%s}] Listening on :%s at port: %d\n", syscall(__NR_gettid), tb,
+           inet_ntoa(address->addr.sin_addr), htons(address->addr.sin_port));
     return 0;
 }
 
@@ -77,39 +105,70 @@ static int fetch_IP(Address *addr, const char *interface) {
     return 1;
 }
 
-static int pconnect(Address *addrarr, int arrlen, in_addr_t conn) {
+static int pconnect(Address *addrarr, int arrlen, Address *newaddr) {
+
     int free = 0;
-    Address tmp;
-    tmp.addr.sin_family = AF_INET;
-    tmp.addr.sin_port = htons(1234); // using generic port here, find solution
-    tmp.addr.sin_addr.s_addr = conn;
-    tmp.addr_len = sizeof(tmp.addr);
-    printf("checking if client is inside the host_client array\n");
-    if(contained_within(addrarr, tmp, arrlen) == 0) {
-        printf("Address already inside array\n");
-        return -1;
-    }
+    newaddr->addr.sin_family = AF_INET;
+    newaddr->addr.sin_port = htons(1234); // using generic port here, find solution
+    newaddr->addr_len = sizeof(newaddr->addr);
+    get_time(tb);
+    printf("[thread: %ld {%s}] checking if client is inside the host_client array\n", syscall(__NR_gettid), tb);
+    int location = 0;
+
     free = next_space(addrarr, arrlen);
     if(free < 0) {
-        printf("Maximum number of machines reached (%d), not adding!\n", arrlen);
+        get_time(tb);
+        printf("[thread: %ld {%s}] Maximum number of machines reached (%d), not adding!\n",
+               syscall(__NR_gettid), tb, arrlen);
+        return -3;
+    }
+    if((location = contained_within(addrarr, *newaddr, arrlen)) == -1) {
+        // if not inside already
+        if((newaddr->sock_out = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+            perror("socket\n");
+            exit(EXIT_FAILURE);
+        }
+        if(connect(newaddr->sock_out, (struct sockaddr*)&newaddr->addr, newaddr->addr_len) < 0) {
+            get_time(tb);
+            printf("[thread: %ld {%s}] Cannot connect to %s @ sock %d\n", syscall(__NR_gettid), tb,
+                   inet_ntoa(newaddr->addr.sin_addr), newaddr->sock_out);
+            close(newaddr->sock_out);
+            return -2;
+        }
+        get_time(tb);
+        printf("[thread: %ld {%s}] IP: %s now connected @ %d\n", syscall(__NR_gettid), tb,
+               inet_ntoa(newaddr->addr.sin_addr), newaddr->sock_out);
+    } else {
+        // if already inside
+        get_time(tb);
+        printf("[thread: %ld {%s}] Address already inside array, adding sock_in: %d\n",
+               syscall(__NR_gettid), tb, newaddr->sock_in);
+        if(addrarr[location].sock_in == 0)
+            addrarr[location].sock_in = newaddr->sock_in;
         return -1;
     }
 
-    if((tmp.sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        perror("socket\n");
-        exit(EXIT_FAILURE);
-    }
-    if(connect(tmp.sock, (struct sockaddr*)&tmp.addr, tmp.addr_len) < 0) {
-        printf("Cannot connect to %d \n", tmp.sock);
-        return -2;
-    }
 
-    Address *ptr = &addrarr[free]; // Address array
-    *ptr = tmp;
+    addrarr[free] = *newaddr;
+//    Address *ptr = &args->conn_clients[free]; // Address array
+//    *ptr = newaddr;
+    get_time(tb);
+    printf("[thread: %ld {%s}] Added %s to conn_clients[%d]: %s and connected to port %d @ socket: %d\n",
+           syscall(__NR_gettid), tb, inet_ntoa(newaddr->addr.sin_addr), free,
+            inet_ntoa(addrarr[free].addr.sin_addr),
+            addrarr[free].addr.sin_port,
+            addrarr[free].sock_out);
 
-    printf("Added %s to list at %d and connected.. sending message\n", inet_ntoa(ptr->addr.sin_addr), free);
-//    write(ptr->sock, "Welcome to the server", 22);
-    return free;
+    get_time(tb);
+    printf("[thread: %ld {%s}] printing conn clients: \n", syscall(__NR_gettid), tb);
+    for(int j = 0; j < arrlen; j++) {
+        printf("{connected} conn_clients[%d]: \nsock_in: %d\nsock_out: %d\n"
+           "address: %s\nport: %d\n", j, addrarr[j].sock_in,
+           addrarr[j].sock_out,
+           inet_ntoa(addrarr[j].addr.sin_addr),
+           htons(addrarr[j].addr.sin_port));
+    }
+    return 0;
 }
 
 static int next_space(Address *addr, int arrlen) {
@@ -117,7 +176,7 @@ static int next_space(Address *addr, int arrlen) {
     int i = 0;
     Address *ptr = addr; // Address array
     while(i < arrlen) {
-        if(ptr->sock == 0) {
+        if(ptr->sock_in == 0 && ptr->sock_out == 0) {
             return i;
         }
         i++; ptr++;
@@ -129,21 +188,18 @@ static int contained_within(Address *addr, Address lookup, int arrlen) {
     Address *ptr = addr; // Address array
     int i = 0;
     while(i < arrlen) {
-        if(
-//                ptr->sock == lookup.sock &&
-//           ptr->addr_len == lookup.addr_len &&
-//           ptr->addr.sin_family == lookup.addr.sin_family
-           ptr->addr.sin_addr.s_addr == lookup.addr.sin_addr.s_addr &&
-           ptr->addr.sin_port == lookup.addr.sin_port
-           ) {
-            printf("lookup address %s contained within the given array at %d\n",
-                   inet_ntoa(lookup.addr.sin_addr), i);
-            return 0;
+        get_time(tb);
+        printf("[thread: %ld{%s}] comparing: connected clients[%d]: %s == %s ?\n",
+               syscall(__NR_gettid), tb, i, inet_ntoa(ptr->addr.sin_addr), inet_ntoa(lookup.addr.sin_addr));
+        if(ptr->addr.sin_addr.s_addr == lookup.addr.sin_addr.s_addr) {
+            get_time(tb);
+            printf("[thread: %ld {%s}] YES, located at %d returning\n", syscall(__NR_gettid), tb, i);
+            return i;
         }
         i++; ptr++;
     }
-    printf("lookup address %s NOT contained within the given array\n",
-           inet_ntoa(lookup.addr.sin_addr));
+    get_time(tb);
+    printf("[thread: %ld {%s}] not found, returning\n", syscall(__NR_gettid), tb);
     return -1;
 }
 
@@ -151,7 +207,7 @@ void *connect_to_file_IPs(void *arg) {
 
     struct connect_to_file_IPs_args *args = (struct connect_to_file_IPs_args *) arg;
     const char *filename = args->filename;
-    char line[32]; // 32 bits for ipv4 address
+    char line[31]; // 32 bits for ipv4 address
     in_addr_t conn;
 
     FILE* file = fopen(filename, "r");
@@ -166,60 +222,33 @@ void *connect_to_file_IPs(void *arg) {
         conn = inet_addr(line);
         // if host IP skip
         if(conn == args->host_addr.addr.sin_addr.s_addr) {
-            printf("Found host IP on list, skipping..\n");
+            get_time(tb);
+            printf("[thread: %ld {%s}] Found host IP on list, skipping..\n", syscall(__NR_gettid), tb);
             continue;
         }
-        // find empty space in host-cli array and assign this IPs info to it
-        pthread_mutex_lock(args->host_client_lock);
-        // start of critical region 1
-        int hcarrloc = pconnect(args->host_client, args->arrlen, conn);
-        if(hcarrloc < 0 ) {
-            // not added due to already existing, array full or couldn't connect
-            continue;
-        }
-        Address newaddr = args->host_client[hcarrloc];
-        // end of critical region 1
-        pthread_mutex_unlock(args->host_client_lock);
-
-        pthread_mutex_lock(args->client_host_lock);
-        // start of critical region 2
-        printf("Checking if:\nsock: %d\naddress: %s\nport: %d\nis inside the client_host array\n", newaddr.sock,
-                                                            inet_ntoa(newaddr.addr.sin_addr),
-                                                            htons(newaddr.addr.sin_port));
-        if(contained_within(args->client_host, newaddr, args->arrlen) != 0) {
-            printf("Not contained within client_host array, not adding to conn_clients\n");
-            pthread_mutex_unlock(args->client_host_lock);
-            continue;
-        }
-        int charrloc = next_space(args->client_host, args->arrlen);
-        // end of critical region 2
-        pthread_mutex_unlock(args->client_host_lock);
-
+        Address new_addr = {0};
+        new_addr.addr.sin_addr.s_addr = conn;
+        // find empty space in conn_cli array and assign this IPs info to it
         pthread_mutex_lock(args->conn_clients_lock);
-        // start of critical region 3
-        int ccarrloc = next_space(args->conn_clients, args->arrlen);
-        printf("Checking if:\nsock: %d\naddress: %s\nport: %d\nis inside the conn_clients array\n", newaddr.sock,
-               inet_ntoa(newaddr.addr.sin_addr),
-               htons(newaddr.addr.sin_port));
-        if(contained_within(args->conn_clients, newaddr, args->arrlen) == 0) {
-            printf("already inside conn_clients\n");
-            pthread_mutex_unlock(args->conn_clients_lock);
-            continue;
+        // ===== critical region start ===== //
+        if(pconnect(args->conn_clients, args->arrlen, &new_addr) < 0 ) {
+            // not added due to already existing, array full or couldn't connect
+            get_time(tb);
+            printf("[thread: %ld {%s}] Pconnect failed!\n", syscall(__NR_gettid), tb);
         }
-        args->conn_clients[ccarrloc] = newaddr; // is this safe?
-        // end of critical region 3
+        // ===== critical region end ===== //
         pthread_mutex_unlock(args->conn_clients_lock);
     }
     fclose(file);
     pthread_exit(0);
 }
 
-int search_IPs(in_addr_t conn, char *filename) {
+int search_IPs(in_addr_t conn, const char *filename) {
 
     char line[32]; // 32 bits for ipv4 address
     in_addr_t newconn;
     FILE* file = fopen(filename, "r");
-    if((file < 0)) {
+    if(file < 0) {
         perror("fopen");
         exit(EXIT_FAILURE);
     }
@@ -234,20 +263,21 @@ int search_IPs(in_addr_t conn, char *filename) {
     fclose(file);
     return -1;
 }
-static int listen_fds(fd_set *fdset, Address host_addr, Address conn_clients[], int arrlen) {
 
-    int maxsd = 0;
-    FD_ZERO(fdset);
-    FD_SET(host_addr.sock, fdset);
-    for(unsigned int i = 0; i < arrlen; i++) {
-        int tmp = conn_clients[i].sock;
-        if(tmp > 0)
-            FD_SET(tmp, fdset);
-        if(tmp > maxsd)
-            maxsd = tmp;
-    }
-    return maxsd;
-}
+//static int listen_fds(fd_set *fdset, Address host_addr, Address conn_clients[], int arrlen) {
+//
+//    int maxsd = 0;
+//    FD_ZERO(fdset);
+//    FD_SET(host_addr.sock, fdset);
+//    for(unsigned int i = 0; i < arrlen; i++) {
+//        int tmp = conn_clients[i].sock;
+//        if(tmp > 0)
+//            FD_SET(tmp, fdset);
+//        if(tmp > maxsd)
+//            maxsd = tmp;
+//    }
+//    return maxsd;
+//}
 
 static int add_address(Address *arr, Address addr, pthread_mutex_t *arr_lock, int arrlen){
 
@@ -271,55 +301,98 @@ static void accept_connection(Address host_addr, Address *client_addr) {
 
     client_addr->addr_len = sizeof(client_addr->addr);
 
-    if ((client_addr->sock = accept(host_addr.sock, (struct sockaddr *)&client_addr->addr,
+    if ((client_addr->sock_in = accept(host_addr.sock_in, (struct sockaddr *)&client_addr->addr,
             (socklen_t *)&client_addr->addr_len)) < 0) {
         perror("accept");
         exit(EXIT_FAILURE);
     }
-    printf("Accepted connection:\nsock: %d\naddress: %s\nport: %d\n", client_addr->sock,
-           inet_ntoa(client_addr->addr.sin_addr),
-           htons(client_addr->addr.sin_port));
-
+    get_time(tb);
+    printf("[thread: %ld {%s}] \n"
+           "Accepted connection:\nsock: %d\naddress: %s\nport: %d\n",
+           syscall(__NR_gettid), tb, client_addr->sock_in,
+            inet_ntoa(client_addr->addr.sin_addr),
+            htons(client_addr->addr.sin_port));
 }
 
 static void add_to_pfds(struct pollfd *pfds, pthread_mutex_t *pfds_lock, int *fdcount, Address add) {
     // need safety check for fdcount
+    if(*fdcount > 3)
+        exit(EXIT_FAILURE);
     pthread_mutex_lock(pfds_lock);
-    pfds[*fdcount].fd = add.sock;
+    pfds[*fdcount].fd = add.sock_in;
     pfds[*fdcount].events = POLLIN;
     (*fdcount)++;
     pthread_mutex_unlock(pfds_lock);
+    for(int i = 0; i < *fdcount; i++) {
+        get_time(tb);
+        printf("[thread: %ld {%s}] pfds[%d].fd = %d\n", syscall(__NR_gettid), tb, i, pfds[i].fd);
+    }
 }
 
 void *new_connection(void *arg) {
 
     struct new_connection_args *args = (struct new_connection_args *) arg;
+    int loc = 0;
     Address new_client;
     memset(&new_client, 0, sizeof(Address));
     accept_connection(args->host_addr, &new_client);
-    // add new connection to client_host array
-    add_address(args->client_host, new_client, args->client_host_lock, args->arrlen);
-    add_to_pfds(args->pfds, args->pfds_lock, args->fdcount, new_client);
-    // if also in hostclient array, add to connected clients
-    printf("Checking if:\nsock: %d\naddress: %s\nport: %d\nis inside the host_client array after adding"
-           "to the client_host\n", new_client.sock,
-           inet_ntoa(new_client.addr.sin_addr),
-           htons(new_client.addr.sin_port));
-    if(contained_within(args->host_client, new_client, args->arrlen) < 0) {
-        printf("Not contained within host client array\n");
-        // check if IP matches one from file, if yes pconnect
-       if(search_IPs(new_client.addr.sin_addr.s_addr, "iplist.txt") == 0) {
-           printf("IP is contained within the iplist file, safe to add\n");
-           if(pconnect(args->host_client, args->arrlen, new_client.addr.sin_addr.s_addr) < 0) {
-               printf("pconnect failed, not adding to connected clients array\n");
-           } else {
-               add_address(args->conn_clients, new_client, args->conn_clients_lock, args->arrlen);
-               printf("Client:\nsock: %d\naddress: %s\nport: %d\n"
-                      "is now inside the conn_client array\n", new_client.sock,
-                      inet_ntoa(new_client.addr.sin_addr),
-                      htons(new_client.addr.sin_port));
-           }
-       }
+    // only add addresses from the ipfile
+
+    /*
+     * check if its inside conn cli
+     * if yes add new socket to the sock_out
+     * if no then do rest
+     */
+    pthread_mutex_lock(args->conn_clients_lock);
+
+//    Address *ptr = args->conn_clients; // Address array
+//    int i = 0;
+//    int found = 0;
+//    while(i < args->arrlen) {
+//        get_time(tb);
+//        printf("[thread: %ld {%s}] comparing cc %s with new %s\n", syscall(__NR_gettid), tb,
+//               inet_ntoa(ptr->addr.sin_addr), inet_ntoa(new_client.addr.sin_addr));
+//        if(ptr->addr.sin_addr.s_addr == new_client.addr.sin_addr.s_addr) {
+//            get_time(tb);
+//            printf("[thread: %ld {%s}] lookup address %s contained within the given array at %d\n",
+//                   syscall(__NR_gettid), tb, inet_ntoa(new_client.addr.sin_addr), i);
+//            found = 1;
+//            break;
+//        }
+//        i++; ptr++;
+//    }
+
+    if((loc = contained_within(args->conn_clients, new_client, args->arrlen)) >= 0) {
+        // already in the array
+        get_time(tb);
+        printf("[thread: %ld {%s}] address already in connected_clients[%d], adding sock_in: %d\n",
+               syscall(__NR_gettid), tb, loc, new_client.sock_in);
+        args->conn_clients[loc].sock_in = new_client.sock_in;
+        add_to_pfds(args->pfds, args->pfds_lock, args->fdcount, new_client);
+    } else {
+        if (search_IPs(new_client.addr.sin_addr.s_addr, args->filename) == 0) {
+            get_time(tb);
+            printf("[thread: %ld {%s}] Contained within IP list\n", syscall(__NR_gettid), tb);
+            // need a pconnect here, think about logic with the 2 Address sockets
+            int free = pconnect(args->conn_clients, args->arrlen, &new_client);
+            if (free > -1) {
+                get_time(tb);
+                printf("[thread: %ld {%s}] Added to conn_clients\n", syscall(__NR_gettid), tb);
+                add_to_pfds(args->pfds, args->pfds_lock, args->fdcount, new_client);
+                get_time(tb);
+                printf("[thread: %ld {%s}] Added to pfds, new size is: %d\n",
+                       syscall(__NR_gettid), tb, *args->fdcount);
+            }
+        }
+    }
+    pthread_mutex_unlock(args->conn_clients_lock);
+    printf("\n");
+    for(int j = 0; j < args->arrlen; j++) {
+        printf("{accepted} conn_clients[%d]: \nsock_in: %d\nsock_out: %d\n"
+               "address: %s\nport: %d\n", j, args->conn_clients[j].sock_in,
+               args->conn_clients[j].sock_out,
+               inet_ntoa(args->conn_clients[j].addr.sin_addr),
+               htons(args->conn_clients[j].addr.sin_port));
     }
     pthread_exit(0);
 }
@@ -327,46 +400,41 @@ void *new_connection(void *arg) {
 void *server_loop(void *arg) {
 
     struct server_loop_args *args = (struct server_loop_args *)arg;
-    int maxpfds = args->arrlen + 1;
-    struct pollfd *pfds = malloc(sizeof(*pfds) * maxpfds); // account for host sock
+    int maxpfds = args->arrlen + 1;// account for host sock
+    int fdcount = 1, pollcnt = -99;
+    struct pollfd *pfds = malloc(sizeof(*pfds) * maxpfds);
     pthread_mutex_t pfds_lock = PTHREAD_MUTEX_INITIALIZER;
-    pfds[0].fd = args->host_addr.sock;
+    get_time(tb);
+    printf("[thread: %ld {%s}] listening on sock %d\n", syscall(__NR_gettid), tb,
+           args->host_addr.sock_in);
+    pfds[0].fd = args->host_addr.sock_in;
     pfds[0].events = POLLIN;
-    int fdcount = 1;
 
     for(;;) {
-        printf("back to polling\n");
-        if(poll(pfds, fdcount, -1)) {
+        get_time(tb);
+        printf("[thread: %ld {%s}] back to polling\n", syscall(__NR_gettid), tb);
+        if((pollcnt = poll(pfds, fdcount, -1)) < 0) {
             perror("poll");
             exit(EXIT_FAILURE);
         }
 
         for(unsigned int i = 0; i < fdcount; i++) {
             if(pfds[i].revents & POLLIN) {
-                if(pfds[i].fd == args->host_addr.sock) {
+                if(pfds[i].fd == args->host_addr.sock_in) {
                     // if host socket, must be new connection
-                    printf("New connection\n");
+                    get_time(tb);
+                    printf("[thread: %ld {%s}] new incoming connection\n", syscall(__NR_gettid), tb);
                     struct new_connection_args nca = {args->conn_clients, args->conn_clients_lock,
-                                           args->host_client, args->host_client_lock,
-                                           args->client_host, args->client_host_lock,
                                            args->host_addr, args->arrlen, &fdcount,
-                                           pfds, &pfds_lock};
+                                           pfds, &pfds_lock, args->filename};
                     pthread_t nc_thread;
+//                    pthread_t thisth = syscall(__NR_gettid);
                     pthread_create(&nc_thread, NULL, new_connection, &nca);
-                    pthread_join(nc_thread, NULL);
+                    get_time(tb);
+                    printf("[thread: %ld {%s}] fdcount = %d\n", syscall(__NR_gettid), tb, fdcount);
+//                    pthread_join(nc_thread, NULL);
 
-//                    printf("\n");
-//                    for(int j = 0; j < args->arrlen; j++) {
-//                        printf("host_client[%d]: \nsock: %d\naddress: %s\nport: %d\n", j, args->host_client[j].sock,
-//                               inet_ntoa(args->host_client[j].addr.sin_addr),
-//                               htons(args->host_client[j].addr.sin_port));
-//                    }
-//                    printf("\n");
-//                    for(int j = 0; j < args->arrlen; j++) {
-//                        printf("client_host[%d]: \nsock: %d\naddress: %s\nport: %d\n", j, args->client_host[j].sock,
-//                               inet_ntoa(args->client_host[j].addr.sin_addr),
-//                               htons(args->client_host[j].addr.sin_port));
-//                    }
+
 //                    printf("\n");
 //                    for(int j = 0; j < args->arrlen; j++) {
 //                        printf("conn_clients[%d]: \nsock: %d\naddress: %s\nport: %d\n", j, args->conn_clients[j].sock,
@@ -375,20 +443,23 @@ void *server_loop(void *arg) {
 //                    }
                 } else {
                     // reading from already connected client
-                    printf("New message/disconnection\n");
+                    get_time(tb);
+                    printf("[thread: %ld {%s}] new message/disconnection\n", syscall(__NR_gettid), tb);
                     char buf[1024] = {0};
                     int nbytes = recv(pfds[i].fd, buf, sizeof buf, 0);
                     if(nbytes <= 0) {
-                        printf("Disconnection\n");
+                        get_time(tb);
+                        printf("[thread: %ld {%s}] disconnection\n", syscall(__NR_gettid), tb);
                         close(pfds[i].fd);
                         pfds[i].events = 0;
                         pfds[i].revents = 0;
                         pfds[i].fd = 0;
                         fdcount--;
                     } else {
-                        printf("Received: %s\n", buf);
+                        get_time(tb);
+                        printf("[thread: %ld {%s}] received: %s\n", syscall(__NR_gettid), tb,
+                               buf);
                     }
-
                 }
             }
         }
@@ -410,10 +481,11 @@ int main(int argc, char *argv[]) {
         printf("%s argument too large!\n", (nrm > INT_MAX) ? "first" : "second");
         exit(EXIT_FAILURE);
     }
+    int err;
     int nrmachines = (int)nrm - 1; // to account for this machine (not adding to connected clients)
     int portnr = (int)pnr;
 
-    Address host_addr = {0, 0, {0}};
+    Address host_addr = {0,0,0, {0}};
     init_server(&host_addr, nrmachines, portnr, infc);
 
     // init Address arrays and their corresponding mutex locks
@@ -421,44 +493,35 @@ int main(int argc, char *argv[]) {
     memset(connected_clients, 0, sizeof(Address) * (nrmachines));
     pthread_mutex_t connected_clients_lock = PTHREAD_MUTEX_INITIALIZER;;
 
-//    memcpy(&connected_clients, &host_addr, sizeof(Address));
-
-    Address host_client[nrmachines];
-    memset(host_client, 0, sizeof(Address) * (nrmachines));
-    pthread_mutex_t host_client_lock = PTHREAD_MUTEX_INITIALIZER;
-
-    Address client_host[nrmachines];
-    memset(client_host, 0, sizeof(Address) * (nrmachines));
-    pthread_mutex_t client_host_lock = PTHREAD_MUTEX_INITIALIZER;
-
     Inprog *inprog = (Inprog *)malloc(sizeof(Inprog));
     memset(inprog, 0, sizeof(Inprog));
     pthread_mutex_t inprog_lock = PTHREAD_MUTEX_INITIALIZER;
 
-//    for(int i = 0; i < 1; i++) {
-//        host_client[i].sock = i + 1;
-//    }
-
     // connect to IPs in ipfile using main thread 0
-    struct connect_to_file_IPs_args ctipa = {connected_clients, &connected_clients_lock,
-                                        host_client, &host_client_lock,
-                                        client_host, &client_host_lock,
-                                        host_addr, nrmachines, fn};
-    pthread_t ctipa_thread;
-    pthread_create(&ctipa_thread, NULL, connect_to_file_IPs, &ctipa);
-    pthread_join(ctipa_thread, NULL);
+
 
     struct server_loop_args sla = {connected_clients, &connected_clients_lock,
-                                   host_client, &host_client_lock,
-                                   client_host, &client_host_lock,
                                    inprog, &inprog_lock,
-                                   host_addr, nrmachines};
+                                   host_addr, nrmachines, fn};
     pthread_t sla_thread;
+    get_time(tb);
+    printf("[thread: %ld {%s}] running server_loop thread\n", syscall(__NR_gettid), tb);
     pthread_create(&sla_thread, NULL, server_loop, &sla);
 //    pthread_join(sla_thread, NULL);
 
+    struct connect_to_file_IPs_args ctipa = {connected_clients, &connected_clients_lock,
+                                             host_addr, nrmachines, fn};
+    pthread_t ctipa_thread;
+    get_time(tb);
+    printf("[thread: %ld {%s}] running connect_to_file_IPs thread\n", syscall(__NR_gettid), tb);
+    pthread_create(&ctipa_thread, NULL, connect_to_file_IPs, &ctipa);
+//    pthread_join(ctipa_thread, NULL);
+
     sleep(1);
     char buf[1024];
+    get_time(tb);
+    printf("[thread: %ld {%s}] starting write loop\n", syscall(__NR_gettid), tb);
+
     for(;;) {
 //        if(client_host[0].sock != 0) {
 //            printf("Reading\n");
@@ -472,17 +535,31 @@ int main(int argc, char *argv[]) {
         char input[32] = {0};
         printf("~ ");
         scanf("%s", input);
-        for(int i = 0; i < nrmachines; i++) {
-            if(write(host_client[i].sock, input, 32) <= 0) {
-                printf("Write to host_client failed!\n");
+        printf("\n");
+//        for(int j = 0; j < nrmachines; j++) {
+//            printf("{main} conn_clients[%d]: \nsock_in: %d\nsock_out: %d\n"
+//                   "address: %s\nport: %d\n", j, connected_clients[j].sock_in,
+//                   connected_clients[j].sock_out,
+//                   inet_ntoa(connected_clients[j].addr.sin_addr),
+//                   htons(connected_clients[j].addr.sin_port));
+//        }
+            if((err = send(connected_clients[0].sock_out, input, 32, 0)) <= 0) {
+//            if((err = write(connected_clients[i].sock_in, input, 32) <= 0)) {
+                if(err < 0) {
+                    perror("send");
+                }
+                get_time(tb);
+                printf("[thread: %ld {%s}] write to host_client failed\n", syscall(__NR_gettid), tb);
             } else {
-                printf("Sent to host_client\n");
+                get_time(tb);
+                printf("[thread: %ld {%s}] sent %d bytes to %s @ sock_out: %d\n", syscall(__NR_gettid),
+                       tb, err, inet_ntoa(connected_clients[0].addr.sin_addr), connected_clients[0].sock_out);
             }
-            printf("host_cli sock[%d]: %d and address: %s\n", i, host_client[i].sock,
-                                                            inet_ntoa(host_client[i].addr.sin_addr));
-            printf("clihost sock[%d]: %d and address: %s\n", i, client_host[i].sock,
-                   inet_ntoa(client_host[i].addr.sin_addr));
-        }
+
+//            printf("host_cli sock[%d]: %d and address: %s\n", i, host_client[i].sock,
+//                                                            inet_ntoa(host_client[i].addr.sin_addr));
+//            printf("clihost sock[%d]: %d and address: %s\n", i, client_host[i].sock,
+//                   inet_ntoa(client_host[i].addr.sin_addr));
     }
 
 
