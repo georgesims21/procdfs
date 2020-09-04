@@ -8,8 +8,8 @@
 #define MAXPATH 64
 
 typedef struct address {
-    int sock_in; // host will use sock_in only
-    int sock_out;
+    int sock_in;  // recv
+    int sock_out; // send
     size_t addr_len;
     struct sockaddr_in addr;
 }Address;
@@ -31,6 +31,7 @@ typedef struct inprog {
     int atomic_counter;
     int messages_sent;
     bool complete;
+    pthread_mutex_t req_ll_lock;
     Request_tracker_node *req_ll_head; // head of linked list of the machines who got message
 }Inprog;
 

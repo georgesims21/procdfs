@@ -5,10 +5,6 @@
 #include <netinet/in.h>
 
 #include "ds_new.h"
-/*
- * Used to deal with any requests from other machines. Including file content
- * requests. For host machine requests see client.c
- */
 
 int init_server(Address *address, int queue_length, int port_number, const char *interface);
 /*
@@ -16,17 +12,9 @@ int init_server(Address *address, int queue_length, int port_number, const char 
  *  @param  queue length - given as argv to filesystem
  *          Address *server_addr
  *  @ret    error codes - print errors to log file too
- *
- *  make server socket into actual socket
- *  fill server address struct with IP information, socket and length
- *  bind the socket and Address->sockaddr_in->... struct
- *  listen to socket and return
  */
 
-
 struct connect_to_file_IPs_args {
-    // understand passing arrays with/out as pointers is the same, server_addr is without * to
-    // ensure it is not modified and that a local copy should be made
     Address *conn_clients; pthread_mutex_t *conn_clients_lock;
     Address host_addr;
     int arrlen;
@@ -37,31 +25,22 @@ void *connect_to_file_IPs(void *arg);
  * connect to IPs: - by main thread 0
  *  @param  void* - pass connIPs_args struct
  *  @ret    NULL - we aren't joining main to this
- *
- *  file pointer to IP file
- *  loop to read line by line each IP:
- *      ignore own
- *      fill in client_add struct with extracted IP and port (mindmap has details)
- *      create new address struct with server_add and add an fd number (socket) and len
- *      if not contained in the hostclient[] add it (don't append, find first empty spot)
- *      if also contained in the clienthost[] then add to connectedclients[] (ditto)
- *  exit thread
  * TODO
- *      * how to find port number from IP?
- *      * test the if free < 0 part
- *      * connect this socket to the IP - comms need testing
  *      * more secure string checking on the file (remove whitespace etc)
  */
-static int fetch_IP(Address *addr, const char *interface);
-static int next_space(Address *addr, int addrlen);
-static int pconnect(Address *addrarr, int arrlen, Address *newaddr);
-static int contained_within(Address *addr, Address lookup, int arrlen);
 
-static int add_address(Address *arr, Address addr, pthread_mutex_t *arr_lock, int arrlen);
-static void paccept(Address host_addr, Address *client_addr);
-static void add_to_pfds(struct pollfd *pfds, pthread_mutex_t *pfds_lock, int *fdcount, Address add);
-void *new_connection(void *arg);
-int search_IPs(in_addr_t conn, const char *filename);
+struct accept_connection_args {
+    Address *conn_clients; pthread_mutex_t *conn_clients_lock;
+    Address host_addr;
+    int arrlen;
+    const char *filename;
+};
+void *accept_connection(void *arg);
+/*
+ * accept_connection - by server thread n
+ * @param   void* - pass accept_connection_args struct
+ * @ret     NULL
+ */
 
 struct server_loop_args {
     Address *conn_clients; pthread_mutex_t *conn_clients_lock;
@@ -113,69 +92,20 @@ void *server_loop(void *arg);
  *
  */
 
-struct accept_connections_args {
-    Address *conn_clients; pthread_mutex_t *conn_clients_lock;
-    Address host_addr;
-    int arrlen;
-    const char *filename;
-};
-
+// statics
 struct new_connection_args {
     Address *conn_clients; pthread_mutex_t *conn_clients_lock;
     Address host_addr;
     int arrlen;
     const char *filename;
 };
-
-/*
- * STATIC accept_connection - by server thread n
- * @param   void* - pass accept_connection_args struct
- * @ret     NULL
- *
- * create address new_client
- * accept connection via the server_sock - use new_client->addr struct to save IP and port info
- * send connected message to socket
- * mutex_lock client_host
- * add address to client_host[]
- * mutex_unlock
- * if contained in host_client[]:
- *      mutex_lock connected_clients
- *      add to connected_clients[]
- *      mutex_unlock
- */
-
-/*
- * struct disconnect_client_args {
- *      mutex_lock_t connected_clients_lock;
- *      address *connected_clients[];
- *      mutex_lock_t client_host_lock;
- *      address *client_host[];
- *      mutex_lock_t host_client_lock;
- *      address *host_client[];
- *      int connected_clients_arrpos;
- *      sd client_sock;
- * };
- */
-
-/*
- * STATIC disconnect_client - by server thread n
- * @param   void* - pass disconnect_client_args struct
- * @ret     NULL
- *
- * mutex_lock connected_clients
- * remove from connected_clients[connected_clients_arrpos] = 0;
- * mutex_unlock
- *
- * mutex_lock host_client
- * remove from host_client[] by matching the sd
- * mutex_unlock
- *
- * mutex_lock client_host
- * remove from client_host[] by matching the sd
- * mutex_unlock
- *
- * free(sock) - could do earlier, not sure if sock would have value after though
- */
+static void *new_connection(void *arg);
+static int fetch_IP(Address *addr, const char *interface);
+static int next_space(Address *addr, int addrlen);
+static int pconnect(Address *addrarr, int arrlen, Address *newaddr);
+static int contained_within(Address *addr, Address lookup, int arrlen);
+static void paccept(Address host_addr, Address *client_addr);
+static int search_IPs(in_addr_t conn, const char *filename);
 
 /*
  * struct extract_file_request_args {
