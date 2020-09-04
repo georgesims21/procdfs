@@ -60,19 +60,21 @@ void *server_loop(void *arg);
  *      add sockets from connected clients[] - can extract the int sock
  *      listen to fdset
  *      noise on master:
- * TODO
- *          accept_connection()
- *          BUG
- *          need to make sure it is being added to host_client correctly or if search methods are
- *          correctly identifying whether an address is within an array. Maybe can be changed to
- *          search for an IP rather than all elements of an address (maybe socket changed?)
- *
- *      handle_client()-remove
+ *      accept_connection()
  *      noise on fdset:
  *          client disconnect:
  *              disconnect_client()
+ * TODO
  *          *need to think about send/recv not reading/sending all bytes in one call!:*
- *          http://brunov.info/blog/2013/02/09/tcpip-client-server-application-exchange-with-string-messages/
+     *          Create the header ()
+         *          need hostip and port
+         *          receiverip and port
+         *          atomic counter
+         *          filepath
+     *          Add flag ()
+     *          Add payload () - if request was recieved
+     *          Get message size ()
+     *          put them together and send
  *          parse flag()
  *          file request:
  *              malloc Request fr;

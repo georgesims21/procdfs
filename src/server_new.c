@@ -416,12 +416,53 @@ int main(int argc, char *argv[]) {
                                    host_addr, nrmachines, fn};
     pthread_t sla_thread;
     pthread_create(&sla_thread, NULL, server_loop, &sla);
+
+    long long a_counter = 0;
+    pthread_mutex_t a_counter_lock = PTHREAD_MUTEX_INITIALIZER;
     char buf[1024];
+    Address ad;
+//    int headersize = (strlen(inet_ntoa(host_addr.addr.sin_addr)) +
+//            sizeof(htons(host_addr.addr.sin_port)) +
+//            strlen(inet_ntoa(ad.addr.sin_addr)) +
+//            sizeof(htons(ad.addr.sin_port)) +
+//            sizeof(a_counter) +
+//            MAXPATH
+//            );
+
+    /*
+     * TODO
+         * Was messing around with a dynamic buffer and adding the header values to it. Worked with
+         snprintf and memmove with the flag but I think bc snprintf adds a term char it doesn't like
+         being done again. Could try memcpy first then snprintf with the content to auto add term char.
+     */
+    int headersize = 32/*IP*/ + 16/*port*/ + 32 + 16 + sizeof(a_counter) + MAXPATH + 1 /*'\0'*/;
     for(;;) {
         printf("~ ");
         scanf("%s", buf);
         for(int i = 0; i < nrmachines; i++) {
-            if((err = send(connected_clients[i].sock_out, buf, sizeof(buf), 0)) <= 0) {
+            char *message = (char *)malloc(headersize);
+            char *content = "This is the content"; // adds term char
+            pthread_mutex_lock(&a_counter_lock);
+            a_counter++;
+            // create header
+            snprintf(message, headersize, "%s%u%s%u%lld%s",
+                     inet_ntoa(host_addr.addr.sin_addr),
+                     htons(host_addr.addr.sin_port),
+                     inet_ntoa(connected_clients[i].addr.sin_addr),
+                     htons(connected_clients[i].addr.sin_port),
+                     a_counter, "/this/is/a/path"); // adds term char
+
+            int buflen = headersize + strlen(content);
+            message = realloc(message, headersize + buflen);
+            snprintf(message, buflen, "%s%s", message, content);
+            // add flag
+            message = realloc(message, headersize + strlen(content) + 1);
+            memmove(&message[1], &message[0], 1);
+            memcpy(&message[0], "2", 1);
+//            int buflen = headersize + strlen(message);
+//            snprintf(buf, headersize + buflen, "%d %s", buflen, buf);
+            pthread_mutex_unlock(&a_counter_lock);
+            if((err = send(connected_clients[i].sock_out, message, headersize, 0)) <= 0) {
                 if(err < 0) {
                     perror("send");
                 }
@@ -432,6 +473,7 @@ int main(int argc, char *argv[]) {
                 printf("[thread: %ld {%s}] sent %d bytes to %s @ sock_out: %d\n", syscall(__NR_gettid),
                        tb, err, inet_ntoa(connected_clients[i].addr.sin_addr), connected_clients[i].sock_out);
             }
+            free(message);
         }
     }
 
