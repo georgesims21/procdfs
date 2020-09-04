@@ -58,6 +58,10 @@ static int pconnect(Address *addrarr, int arrlen, Address *newaddr);
 static int contained_within(Address *addr, Address lookup, int arrlen);
 
 static int add_address(Address *arr, Address addr, pthread_mutex_t *arr_lock, int arrlen);
+static void paccept(Address host_addr, Address *client_addr);
+static void add_to_pfds(struct pollfd *pfds, pthread_mutex_t *pfds_lock, int *fdcount, Address add);
+void *new_connection(void *arg);
+int search_IPs(in_addr_t conn, const char *filename);
 
 struct server_loop_args {
     Address *conn_clients; pthread_mutex_t *conn_clients_lock;
@@ -109,14 +113,19 @@ void *server_loop(void *arg);
  *
  */
 
-struct new_connection_args {
+struct accept_connections_args {
     Address *conn_clients; pthread_mutex_t *conn_clients_lock;
     Address host_addr;
-    int arrlen; int *fdcount;
-    struct pollfd *pfds; pthread_mutex_t *pfds_lock;
+    int arrlen;
     const char *filename;
 };
 
+struct new_connection_args {
+    Address *conn_clients; pthread_mutex_t *conn_clients_lock;
+    Address host_addr;
+    int arrlen;
+    const char *filename;
+};
 
 /*
  * STATIC accept_connection - by server thread n
