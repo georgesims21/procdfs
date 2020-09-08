@@ -340,17 +340,58 @@ void *server_loop(void *arg) {
         for(unsigned int i = 0; i < fdcount; i++) {
             if(pfds[i].revents & POLLIN) {
                 // reading from already connected client
-                char buf[1024] = {0};
-                int nbytes = recv(pfds[i].fd, buf, sizeof buf, 0); // needs doing correctly
+                char buf[1023] = {0};
+                /*
+                 * TODO
+                     * extract until - delimiter and save as size_t msglen
+                         * read sizeof(size_t)
+                         * pointer to string
+                         * move pointer one by one to find '-'
+                             * each char append to new buf
+                             * strncmp
+                             * convert this to size_t variable
+                     * read until that amount is 0
+                     * begin to deconstruct
+                         * flag
+                         * senderIP and senderPort
+                         * hostIP and hostPort - error check
+                         * atomic counter
+                         * path
+                         * buf (size: msglen - HEADER) - can be 0 if filereq
+                     * Save into Request
+                     * switch
+                         * 1: file request
+                             * (extra) make into void method
+                         * 2: content received
+                             * (extra) make into void method
+                 */
+                int nbytes = recv(pfds[i].fd, buf, sizeof(size_t), 0); // needs doing correctly
                 if(nbytes <= 0) {
                     get_time(tb);
                     printf("[thread: %ld {%s}] disconnection, exiting..\n", syscall(__NR_gettid), tb);
                     exit(EXIT_SUCCESS);
-                } else {
-                    get_time(tb);
-                    printf("[thread: %ld {%s}] (%d) bytes received: %s\n", syscall(__NR_gettid), tb,
-                           nbytes, buf);
                 }
+                char len[sizeof(size_t)] = {0};
+                int counter = 0, readbytes = 0;
+                while(buf[counter] != '-') {
+                    strncat(len, &buf[counter], 1);
+                    counter++;
+                }
+                // here len should have string containing total length to read
+                char tmp[1023] = {0};
+                int total = atoi(len); // quick and dirty, change to strtol later
+                printf("total = %d\n", total);
+                // save after '-' into tmp
+                memcpy(tmp, &buf[counter + 1], counter + 1);
+                readbytes = total;
+                readbytes -= counter + 1; // account for the '-'. Included when sending for ease of snprintf
+                while(readbytes != 0) {
+                    readbytes -= recv(pfds[i].fd, buf, sizeof(size_t), 0);
+                    strcat(tmp, buf);
+                }
+                get_time(tb);
+                printf("[thread: %ld {%s}] (%d) bytes received: %s\n", syscall(__NR_gettid), tb,
+                       readbytes, tmp);
             }
         } // END of poll loop
     } // END of inf for loop
@@ -409,6 +450,9 @@ int main(int argc, char *argv[]) {
                inet_ntoa(connected_clients[j].addr.sin_addr),
                htons(connected_clients[j].addr.sin_port));
     }
+    printf("on this address: \n%s\t@\t%d\n",
+            inet_ntoa(host_addr.addr.sin_addr),
+            htons(host_addr.addr.sin_port));
 
     // start server loop to listen for connections
     struct server_loop_args sla = {connected_clients, &connected_clients_lock,
@@ -431,38 +475,67 @@ int main(int argc, char *argv[]) {
 
     /*
      * TODO
-         * Was messing around with a dynamic buffer and adding the header values to it. Worked with
-         snprintf and memmove with the flag but I think bc snprintf adds a term char it doesn't like
-         being done again. Could try memcpy first then snprintf with the content to auto add term char.
+         * malloc a Request and request_tracker_node
+         * fill in Request, point rtn to it
+         * point inprog.req_ll_head to this (head)
+         * fill in details of Request
+         * BUG: need to be precise about the message length of the string rather than the 'max' it can be
+         so the reading method will be correct. currently cannot read until the variable is 0 because the
+         size we prepend is too big. Try just getting strlen before sending, prepend, then on the read just
+         extract as we have done but take away the amount of chars from the prepended size and the '-' char.
+         If get stuct tomorrow just read the rest of the size for now and come back to it.
+
      */
-    int headersize = 32/*IP*/ + 16/*port*/ + 32 + 16 + sizeof(a_counter) + MAXPATH + 1 /*'\0'*/;
+
+    int headersize = 32/*IP*/ + 16/*port*/ + 32 + 16 + 64 /*long long*/ + MAXPATH + 1 /*'\0'*/;
+    char hostip[32];
+    snprintf(hostip, 32, "%s", inet_ntoa(host_addr.addr.sin_addr));
+    char hostpo[16];
+    snprintf(hostpo, 16, "%d", htons(host_addr.addr.sin_port));
     for(;;) {
         printf("~ ");
         scanf("%s", buf);
+        pthread_mutex_lock(&a_counter_lock);
+        a_counter++; // only increment this on new request NOT each machine
         for(int i = 0; i < nrmachines; i++) {
-            char *message = (char *)malloc(headersize);
-            char *content = "This is the content"; // adds term char
-            pthread_mutex_lock(&a_counter_lock);
-            a_counter++;
-            // create header
-            snprintf(message, headersize, "%s%u%s%u%lld%s",
-                     inet_ntoa(host_addr.addr.sin_addr),
-                     htons(host_addr.addr.sin_port),
-                     inet_ntoa(connected_clients[i].addr.sin_addr),
-                     htons(connected_clients[i].addr.sin_port),
-                     a_counter, "/this/is/a/path"); // adds term char
-
-            int buflen = headersize + strlen(content);
-            message = realloc(message, headersize + buflen);
-            snprintf(message, buflen, "%s%s", message, content);
-            // add flag
-            message = realloc(message, headersize + strlen(content) + 1);
-            memmove(&message[1], &message[0], 1);
-            memcpy(&message[0], "2", 1);
-//            int buflen = headersize + strlen(message);
-//            snprintf(buf, headersize + buflen, "%d %s", buflen, buf);
+            Request *req = (Request *)malloc(sizeof(Request));
+            req->sender = connected_clients[i];
+            req->atomic_counter = a_counter;
             pthread_mutex_unlock(&a_counter_lock);
-            if((err = send(connected_clients[i].sock_out, message, headersize, 0)) <= 0) {
+            snprintf(req->path, MAXPATH, "this/is/a/path");
+            char *payload = "This is the content"; // adds term char
+            req->buflen = strlen(payload) + 1; // for term char
+            req = realloc(req, sizeof(Request) + req->buflen);
+            snprintf(req->buf, req->buflen, "%s", payload);
+            // everything inside Request now. Make into stream with bytes and flag now
+
+
+
+            char header[headersize];
+            // create header
+            snprintf(header, headersize, "%s%s%s%hu%llu%s",
+                     hostip,
+                     hostpo,
+                     inet_ntoa(req->sender.addr.sin_addr),
+                     htons(req->sender.addr.sin_port),
+                     req->atomic_counter,
+                     req->path
+                     );
+            size_t total_size = strlen(header); // rather than whole length if not totally filled
+            // add flag
+            char flag = 2 + '0';
+            total_size += sizeof(char); // flag
+            total_size += req->buflen;
+            total_size += 1; // - delimeter char
+            size_t fin_size = total_size + sizeof(total_size); // we don't want the size var included
+            // add total
+            char *message = malloc(fin_size); // for total_size var
+            snprintf(message, fin_size, "%zu-%c%s%s",
+                     total_size,
+                     flag,
+                     header,
+                     req->buf);
+            if((err = send(connected_clients[i].sock_out, message, total_size, 0)) <= 0) {
                 if(err < 0) {
                     perror("send");
                 }
