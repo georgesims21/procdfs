@@ -340,9 +340,9 @@ void *server_loop(void *arg) {
         for(unsigned int i = 0; i < fdcount; i++) {
             if(pfds[i].revents & POLLIN) {
                 // reading from already connected client
-                char buf[1023] = {0};
+                char buf[4000] = {0};
                 /*
-                 * TODO
+                 * DONE
                      * extract until - delimiter and save as size_t msglen
                          * read sizeof(size_t)
                          * pointer to string
@@ -351,6 +351,7 @@ void *server_loop(void *arg) {
                              * strncmp
                              * convert this to size_t variable
                      * read until that amount is 0
+                 * TODO
                      * begin to deconstruct
                          * flag
                          * senderIP and senderPort
@@ -364,6 +365,7 @@ void *server_loop(void *arg) {
                              * (extra) make into void method
                          * 2: content received
                              * (extra) make into void method
+                     * Going to need the inprog_tracker_node ll as global so fuse can access
                  */
                 int nbytes = recv(pfds[i].fd, buf, sizeof(size_t), 0); // needs doing correctly
                 if(nbytes <= 0) {
@@ -378,20 +380,24 @@ void *server_loop(void *arg) {
                     counter++;
                 }
                 // here len should have string containing total length to read
-                char tmp[1023] = {0};
+                char tmp[4000] = {0};
                 int total = atoi(len); // quick and dirty, change to strtol later
-                printf("total = %d\n", total);
                 // save after '-' into tmp
                 memcpy(tmp, &buf[counter + 1], counter + 1);
+                total -= nbytes; // already read 8 bytes
+                total += (counter + 1); // account for the size and '-'
                 readbytes = total;
-                readbytes -= counter + 1; // account for the '-'. Included when sending for ease of snprintf
-                while(readbytes != 0) {
-                    readbytes -= recv(pfds[i].fd, buf, sizeof(size_t), 0);
+                while(readbytes > 0) {
+                    readbytes -= recv(pfds[i].fd, buf, readbytes, 0);
                     strcat(tmp, buf);
                 }
                 get_time(tb);
                 printf("[thread: %ld {%s}] (%d) bytes received: %s\n", syscall(__NR_gettid), tb,
                        readbytes, tmp);
+
+                // here need to start extracting
+
+                b
             }
         } // END of poll loop
     } // END of inf for loop
@@ -479,12 +485,6 @@ int main(int argc, char *argv[]) {
          * fill in Request, point rtn to it
          * point inprog.req_ll_head to this (head)
          * fill in details of Request
-         * BUG: need to be precise about the message length of the string rather than the 'max' it can be
-         so the reading method will be correct. currently cannot read until the variable is 0 because the
-         size we prepend is too big. Try just getting strlen before sending, prepend, then on the read just
-         extract as we have done but take away the amount of chars from the prepended size and the '-' char.
-         If get stuct tomorrow just read the rest of the size for now and come back to it.
-
      */
 
     int headersize = 32/*IP*/ + 16/*port*/ + 32 + 16 + 64 /*long long*/ + MAXPATH + 1 /*'\0'*/;
@@ -527,15 +527,36 @@ int main(int argc, char *argv[]) {
             total_size += sizeof(char); // flag
             total_size += req->buflen;
             total_size += 1; // - delimeter char
-            size_t fin_size = total_size + sizeof(total_size); // we don't want the size var included
+            total_size += sizeof(size_t);
+
+            // size_t is 8 bytes, must change total_size to account for width (i.e if == 50 then do 8 - 6 == 2(for 2 chars 5 and 0))
+            // 10^n where:
+            if(total_size < 10) { // n = 1
+                total_size -= 7;
+            } else if(total_size < 100) { // n = 2
+                total_size -= 6;
+            } else if(total_size < 1000) { // n = 3
+                total_size -= 5;
+            } else if(total_size < 10000) { // ...
+                total_size -= 4;
+            } else if(total_size < 100000) {
+                total_size -= 3;
+            }else if(total_size < 1000000) {
+                total_size -= 2;
+            }else if(total_size < 10000000) {
+                total_size -= 1;
+            }
             // add total
-            char *message = malloc(fin_size); // for total_size var
-            snprintf(message, fin_size, "%zu-%c%s%s",
+            char *message = malloc(total_size); // for total_size var
+            snprintf(message, total_size, "%zu-%c%s%s",
                      total_size,
                      flag,
                      header,
                      req->buf);
-            if((err = send(connected_clients[i].sock_out, message, total_size, 0)) <= 0) {
+//            char *final_message = malloc(total_size + sizeof(size_t) + 1);
+//            snprintf(final_message, total_size + sizeof(size_t) +1, "%zu%s", total_size, message);
+            printf("message length == %lu\ntotal_size == %lu\nmessage: %s\n", strlen(message), total_size, message);
+            if((err = send(connected_clients[i].sock_out, message, strlen(message), 0)) <= 0) {
                 if(err < 0) {
                     perror("send");
                 }

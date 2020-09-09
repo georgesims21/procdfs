@@ -16,9 +16,9 @@ typedef struct address {
 
 typedef struct request {
     Address sender;
-    int atomic_counter;
+    long long atomic_counter;
     char path[MAXPATH];
-    long buflen;
+    unsigned long buflen;
     char buf[]; // to allow for flexible array member
 }Request;
 
