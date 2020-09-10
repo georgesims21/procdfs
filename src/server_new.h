@@ -6,6 +6,9 @@
 
 #include "ds_new.h"
 
+#define FREQ 1
+#define FCNT 2
+
 int init_server(Address *address, int queue_length, int port_number, const char *interface);
 /*
  * init server: - by main thread
