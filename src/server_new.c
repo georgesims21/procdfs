@@ -382,8 +382,8 @@ void *server_loop(void *arg) {
                          * atomic counter
                          * path
                          * buf (size: msglen - HEADER) - can be 0 if filereq
-                 * TODO
                      * Save into Request
+                 * TODO
                      * switch
                          * 1: file request
                              * (extra) make into void method
@@ -420,6 +420,7 @@ void *server_loop(void *arg) {
                 Address sender = {0};
                 Address host = {0};
                 Request *req = (Request *)malloc(sizeof(Request));
+                memset(req, 0, sizeof(Request));
                 int cptr = 0, delim = 0;
                 int flag = 0;
                 char senderIP[32] = {0};
@@ -493,14 +494,17 @@ void *server_loop(void *arg) {
                     exit(EXIT_FAILURE);
                 }
 
+                // check whether sender is inside conn_cli array
                 sender.addr.sin_addr.s_addr = inet_addr(senderIP);
                 int sp = atoi(senderPort);
                 sender.addr.sin_port = htons(sp);
+                pthread_mutex_lock(args->conn_clients_lock);
                 // use this to find variable in conn_cli, make copy once found
                 if((contained_within_ret(args->conn_clients, &sender, args->arrlen)) == -1) {
                     printf("Couldn't find sender address within conn_cli array, exiting..\n");
                     exit(EXIT_FAILURE);
                 }
+                pthread_mutex_unlock(args->conn_clients_lock);
                 req->sender = sender;
                 req->atomic_counter = strtoll(a_counter, NULL, 10);
                 strcpy(req->path, path);
@@ -510,7 +514,7 @@ void *server_loop(void *arg) {
                     case FREQ: // 1: other machine requesting file content
                         break;
                     case FCNT: // 2: this machine receiving a response with content
-                        req->buflen = char_count + 1;
+                        req->buflen = char_count + 1; // char count includes 0 index so must add 1
                         req = realloc(req, sizeof(Request) + req->buflen);
                         memset(req->buf, 0, req->buflen);
                         // buffer, no delim so must just go on rest of size - done in switch
@@ -519,12 +523,29 @@ void *server_loop(void *arg) {
                             e_ptr++;
                             char_count--;
                         }
+                        Request_tracker_node *rtn = (Request_tracker_node *)malloc(sizeof(Request_tracker_node));
+                        pthread_mutex_lock(args->inprog_lock);
+                        if((rtn = req_tracker_ll_fetch(&args->inprog->req_ll_head, *req)) != NULL) {
+                            // Realloc this rtn and copy buflen and buf into it, now it is complete
+                            printf("Request found!\n");
+                            rtn->req->buflen = req->buflen;
+                            rtn->req = realloc(rtn->req, sizeof(Request) + req->buflen);
+                            memset(rtn->req->buf, 0, req->buflen);
+                            strcpy(rtn->req->buf, req->buf);
+                            printf("After adding buffer:\n");
+                            req_tracker_ll_print(&args->inprog->req_ll_head);
+                            exit(EXIT_SUCCESS);
+                        } else {
+                            printf("Request not contained within the linked list, exiting...\n");
+                            exit(EXIT_FAILURE);
+                        }
+                        pthread_mutex_unlock(args->inprog_lock);
                         break;
                     default:
                         break;
                 }
 
-                exit(EXIT_SUCCESS);
+//                exit(EXIT_SUCCESS);
 
 
 
@@ -645,7 +666,9 @@ int main(int argc, char *argv[]) {
             char size[sizeof(size_t)] = {0};
             char flag = 2 + '0';
             char *payload = "This is the content"; // adds term char
+            // create request
             Request *req = (Request *)malloc(sizeof(Request));
+            memset(req, 0, sizeof(Request));
             // fill in request struct with info
             req->sender = connected_clients[i];
             req->atomic_counter = a_counter;
@@ -656,10 +679,17 @@ int main(int argc, char *argv[]) {
             req = realloc(req, sizeof(Request) + req->buflen);
             snprintf(req->buf, req->buflen, "%s", payload);
             // everything inside Request now. Make into stream with bytes and flag now
+
+            // Add to inprog
+            pthread_mutex_lock(&inprog_lock);
+            req_tracker_ll_add(&inprog->req_ll_head, req);
+            req_tracker_ll_print(&inprog->req_ll_head);
+            pthread_mutex_unlock(&inprog_lock);
+
             // create header
-            snprintf(header, headersize + 5, "%s-%s-%s-%hu-%llu-%s",
-                     hostip,
-                     hostpo,
+            snprintf(header, headersize + 5/*for '-'s*/, "%s-%s-%s-%hu-%llu-%s",
+                     hostip, // should be: inet_ntoa(host_addr.addr.sin_addr)
+                     hostpo, //            htons(host_addr.addr.sin_port)
                      inet_ntoa(req->sender.addr.sin_addr),
                      htons(req->sender.addr.sin_port),
                      req->atomic_counter,

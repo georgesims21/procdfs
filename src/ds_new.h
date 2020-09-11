@@ -31,7 +31,6 @@ typedef struct inprog {
     int atomic_counter;
     int messages_sent;
     bool complete;
-    pthread_mutex_t req_ll_lock;
     Request_tracker_node *req_ll_head; // head of linked list of the machines who got message
 }Inprog;
 

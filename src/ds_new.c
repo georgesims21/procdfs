@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <arpa/inet.h>
 
 int req_tracker_ll_add(Request_tracker_node **head, Request *req) {
 
@@ -23,6 +24,7 @@ int req_tracker_ll_add(Request_tracker_node **head, Request *req) {
     } else {
         // append to end of list
         while(listptr->next != NULL)
+            // should we check if exists here too?
             listptr = listptr->next;
         listptr->next = newnode;
     }
@@ -33,9 +35,6 @@ int request_cmp(Request req1, Request req2) {
 
     if (req1.atomic_counter == req2.atomic_counter &&
             strncmp(req1.path, req2.path, strlen(req1.path)) == 0 &&
-            req1.buflen == req2.buflen &&
-            req1.sender.sock == req2.sender.sock &&
-            req1.sender.addr.sin_addr.s_addr == req2.sender.addr.sin_addr.s_addr &&
             req1.sender.addr.sin_addr.s_addr == req2.sender.addr.sin_addr.s_addr) {
         return 0;
     }
@@ -79,10 +78,11 @@ void req_tracker_ll_print(Request_tracker_node **head) {
 
     if(listptr != NULL) {
         while (listptr != NULL) {
-            printf("req_tracker_ll[%d]:\nAtomic counter: %d\n"
+            printf("req_tracker_ll[%d]:\nAtomic counter: %llu\n"
                    "File path: %s\n"
-                   "Socket: %d\n"
-                   "IP: %u\n"
+                   "Sock_in: %d\n"
+                   "Sock_out: %d\n"
+                   "IP: %s\n"
                    "Port: %u\n"
                    "Buflen: %lu\n"
                    "Sender buf: %s\n"
@@ -90,9 +90,10 @@ void req_tracker_ll_print(Request_tracker_node **head) {
                    count,
                    listptr->req->atomic_counter,
                    listptr->req->path,
-                   listptr->req->sender.sock,
-                   listptr->req->sender.addr.sin_addr.s_addr,
-                   listptr->req->sender.addr.sin_addr.s_addr,
+                   listptr->req->sender.sock_in,
+                   listptr->req->sender.sock_out,
+                   inet_ntoa(listptr->req->sender.addr.sin_addr),
+                   htons(listptr->req->sender.addr.sin_port),
                    listptr->req->buflen,
                    (listptr->req->buflen > 0) ? listptr->req->buf : ""
             );
