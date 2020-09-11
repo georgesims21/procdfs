@@ -1,4 +1,5 @@
 #include <arpa/inet.h>
+#include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,6 +17,7 @@
 #include <math.h>
 #include <sys/types.h>
 #include <sys/syscall.h>
+#include <fcntl.h>
 #include "server_new.h"
 #include "ds_new.h"
 
@@ -342,6 +344,19 @@ int parse_flag(char *buf) {
     return flag;
 }
 
+int procsizefd(int fd) {
+
+    char buf[4096];
+    int count = 0;
+    if(fd < 0)
+        // file doesn't exist
+        return -1;
+    while(read(fd, buf, 1) > 0) {
+        count++;
+    }
+    return count;
+}
+
 void *server_loop(void *arg) {
 
     struct server_loop_args *args = (struct server_loop_args *)arg;
@@ -420,6 +435,10 @@ void *server_loop(void *arg) {
                 Address sender = {0};
                 Address host = {0};
                 Request *req = (Request *)malloc(sizeof(Request));
+                if(req == NULL) {
+                    perror("malloc");
+                    exit(EXIT_FAILURE);
+                }
                 memset(req, 0, sizeof(Request));
                 int cptr = 0, delim = 0;
                 int flag = 0;
@@ -476,7 +495,7 @@ void *server_loop(void *arg) {
                 }
                 e_ptr++;
                 // path
-                while(*e_ptr != '-') {
+                while(*e_ptr != '-' && char_count >= -1) { // TODO: this -1 is not OK
                     strncat(path, e_ptr, 1);
                     e_ptr++;
                     char_count--;
@@ -507,12 +526,37 @@ void *server_loop(void *arg) {
                 pthread_mutex_unlock(args->conn_clients_lock);
                 req->sender = sender;
                 req->atomic_counter = strtoll(a_counter, NULL, 10);
-                strcpy(req->path, path);
+                strncpy(req->path, path, strlen(path));
                 // now we have a request struct we can switch for what we need
 
                 switch(flag) {
-                    case FREQ: // 1: other machine requesting file content
+                    case FREQ: { // 1: other machine requesting file content
+                        int fd = -1, res = 0, offset = 0, size = 0;
+                        fd = openat(AT_FDCWD, req->path, O_RDONLY);
+                        if (fd == -1) {
+                            perror("openat");
+                            exit (EXIT_FAILURE);
+                        }
+                        size = procsizefd(fd);
+                        char *procbuf = malloc(sizeof(char) * size);
+                        printf("procsize: %d\n", size);
+
+                        res = pread(fd, procbuf, size, offset);
+                        if (res == -1) {
+                            perror("pread");
+                            exit(EXIT_FAILURE);
+                        }
+                        req->buflen = size;
+                        req = realloc(req, sizeof(Request) + req->buflen);
+                        memset(req->buf, 0, sizeof(req->buflen));
+                        snprintf(req->buf, req->buflen, "%s", procbuf);
+                        printf("buff: %s", procbuf);
+
+                        // send the req back to the sender
+
+                        free(procbuf);
                         break;
+                    }
                     case FCNT: // 2: this machine receiving a response with content
                         req->buflen = char_count + 1; // char count includes 0 index so must add 1
                         req = realloc(req, sizeof(Request) + req->buflen);
@@ -524,6 +568,10 @@ void *server_loop(void *arg) {
                             char_count--;
                         }
                         Request_tracker_node *rtn = (Request_tracker_node *)malloc(sizeof(Request_tracker_node));
+                        if(rtn == NULL) {
+                            perror("malloc");
+                            exit(EXIT_FAILURE);
+                        }
                         pthread_mutex_lock(args->inprog_lock);
                         if((rtn = req_tracker_ll_fetch(&args->inprog->req_ll_head, *req)) != NULL) {
                             // Realloc this rtn and copy buflen and buf into it, now it is complete
@@ -544,6 +592,7 @@ void *server_loop(void *arg) {
                     default:
                         break;
                 }
+                free(req);
 
 //                exit(EXIT_SUCCESS);
 
@@ -597,6 +646,10 @@ int main(int argc, char *argv[]) {
     pthread_mutex_t connected_clients_lock = PTHREAD_MUTEX_INITIALIZER;;
 
     Inprog *inprog = (Inprog *)malloc(sizeof(Inprog));
+    if(inprog == NULL) {
+        perror("malloc");
+        exit(EXIT_FAILURE);
+    }
     memset(inprog, 0, sizeof(Inprog));
     pthread_mutex_t inprog_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -664,7 +717,7 @@ int main(int argc, char *argv[]) {
         for(int i = 0; i < nrmachines; i++) {
             char header[headersize + 5];
             char size[sizeof(size_t)] = {0};
-            char flag = 2 + '0';
+            char flag = FREQ + '0';
             char *payload = "This is the content"; // adds term char
             // create request
             Request *req = (Request *)malloc(sizeof(Request));
@@ -673,11 +726,11 @@ int main(int argc, char *argv[]) {
             req->sender = connected_clients[i];
             req->atomic_counter = a_counter;
             pthread_mutex_unlock(&a_counter_lock);
-            snprintf(req->path, MAXPATH, "this/is/a/path");
+            snprintf(req->path, MAXPATH, "/proc/net/dev");
 // 1064 bit    char *payload = "KKE9k7y0kPo9swmIeo9HrIty6MMER65NPoq5uzzoqfSterUjglE2xkoMuZhRelWcff2p341gHWwRZI59zNs0UGKSwfoP0bWCp4B6qjXs2kEBS1GMlsYcawhT6x8FHSTJ8IlZ28f8r039XwjrHK96t5wETDJKDBl8RiIqRdVScqFbXqRspZ7nAMCzPORaoPV1J7MDAiS60arBJroErz26hkcMTy1X6O1UPWAJ6AvaSvNeOHQ8rVNM2JP1cAKz2CtlJ2S1sw81BEHGJTjGrpkNhxDFxLMsOekRk03hD2rco6Aimj9ulQYzXWBpICB5wxzQAKGuQLlk4STrgTupCZWm2sElYdKc9sniJN4udV8RYGf5qQijhWHXarUT0vjI9GtMua6TgMyHaudhga6lIGeSzkOXiyzHFg7fKClzeTIeejfIBgB4JshAiK13YcOXrsQSK5mZOrBI2goiE82ONaF8pnJZT5xk2ZfW3JSgsl8XS0Sz5eGbcjPoaXHPkTLDQ6LyArOspyutik5S07mtrm5xdTYQTBzkouGhrCLiw1C8tlBbBF5uxqz8owWvaNXW9AXeTYyAGP8gzxknGMLVMxT5RmipcRaBXCMswiXRqFsUBkZhggrAQl5dQxOx8z7eZC69BbJvvjGSDksmVCBGhU0czpk5ivhQX3FgpjX2cJhAMDEWYjopkrF4YfEi3tnJDlA2aEfrPsdhxDnmWVdTQUBkSJrMX4gfl2GoUivkVKGXYisZOThd9RqMwVkJlPXNgin1dsOWPNRLvd13i4hTViMH41fSo0Laz1D75KSd2TRB97MVsz2uoYaTaKybm1PpUEATkBDXMNZNF6umlQkhqG0UjAWWH7CKYx5gq10xfgeADk1Kc3xW6KxLSuCvTSiTkX9B2q94B5H6pvF6I3g5cD7bpOJyVUE0lDFMjszvz7ZkBEIFFr8gDxdmYVFXFViSGQDZt9haUePdGXW8F7auDAKubg6KowIB1JYkVPAH98Pz7CcPzNZh8Y8BvF0n7qVxuqfD3stWS3PkZTyDmwuAj6bZ9fwkkNKj0Idml2mRWUTI"; // adds term char
-            req->buflen = strlen(payload) + 1;
-            req = realloc(req, sizeof(Request) + req->buflen);
-            snprintf(req->buf, req->buflen, "%s", payload);
+//            req->buflen = strlen(payload) + 1;
+//            req = realloc(req, sizeof(Request) + req->buflen);
+//            snprintf(req->buf, req->buflen, "%s", payload);
             // everything inside Request now. Make into stream with bytes and flag now
 
             // Add to inprog
@@ -697,18 +750,16 @@ int main(int argc, char *argv[]) {
             );
             size_t total_size = strlen(header); // rather than whole length if not totally filled
             total_size += sizeof(char); // flag
-            total_size += req->buflen;
             total_size += 3; // - delimeter chars
             // change size into char and get len
             sprintf(size, "%zu", total_size);
             total_size += strlen(size);
             // add total
             char *message = malloc(total_size); // for total_size var
-            snprintf(message, total_size, "%zu-%c-%s-%s",
+            snprintf(message, total_size, "%zu-%c-%s",
                      total_size - 1,
                      flag,
-                     header,
-                     req->buf);
+                     header);
             if((err = send(connected_clients[i].sock_out, message, strlen(message), 0)) <= 0) {
                 if(err < 0) {
                     perror("send");
