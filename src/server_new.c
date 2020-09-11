@@ -357,6 +357,44 @@ int procsizefd(int fd) {
     return count;
 }
 
+char *create_message(char *hostip, char *hostport, Request *req, int headerlen, int flag) {
+    if(req->sender.addr.sin_addr.s_addr == 0 || (0 > flag && flag > 3))
+        return NULL;
+    char header[headerlen + 5];
+    char size[sizeof(size_t)] = {0};
+    // create header
+    snprintf(header, headerlen, "%s-%s-%s-%hu-%llu-%s-",
+             hostip,
+             hostport,
+             inet_ntoa(req->sender.addr.sin_addr),
+             htons(req->sender.addr.sin_port),
+             req->atomic_counter,
+             req->path
+    );
+    size_t total_size = strlen(header); // rather than whole length if not totally filled
+    total_size += sizeof(char); // flag
+    total_size += 2; // - delimeter chars
+    total_size += (flag == FCNT) ? req->buflen : 0;
+    // change size into char and get len
+    sprintf(size, "%zu", total_size);
+    total_size += strlen(size);
+    // add total
+    char *message = malloc(total_size + 1); // add term char
+    if(flag == FCNT) {
+        snprintf(message, total_size, "%zu-%d-%s%s",
+                 total_size - 1,
+                 flag,
+                 header,
+                 req->buf);
+    } else {
+        snprintf(message, total_size, "%zu-%d-%s",
+                 total_size - 1,
+                 flag,
+                 header);
+    }
+    return message;
+}
+
 void *server_loop(void *arg) {
 
     struct server_loop_args *args = (struct server_loop_args *)arg;
@@ -531,6 +569,7 @@ void *server_loop(void *arg) {
 
                 switch(flag) {
                     case FREQ: { // 1: other machine requesting file content
+                        printf("File request received\n");
                         int fd = -1, res = 0, offset = 0, size = 0;
                         fd = openat(AT_FDCWD, req->path, O_RDONLY);
                         if (fd == -1) {
@@ -553,11 +592,25 @@ void *server_loop(void *arg) {
                         printf("buff: %s", procbuf);
 
                         // send the req back to the sender
-
+                        char *message = create_message(hostIP, hostPort, req, HEADER, FCNT);
+                        int err = 0;
+                        if((err = send(req->sender.sock_out, message, strlen(message), 0)) <= 0) {
+                            if(err < 0) {
+                                perror("send");
+                            }
+                            get_time(tb);
+                            printf("[thread: %ld {%s}] write to host_client failed\n", syscall(__NR_gettid), tb);
+                        } else {
+                            get_time(tb);
+                            printf("[thread: %ld {%s}] sent %d bytes to %s @ sock_out: %d\n", syscall(__NR_gettid),
+                                   tb, err, inet_ntoa(req->sender.addr.sin_addr), req->sender.sock_out);
+                        }
+                        free(message);
                         free(procbuf);
                         break;
                     }
                     case FCNT: // 2: this machine receiving a response with content
+                    printf("File content received\n");
                         req->buflen = char_count + 1; // char count includes 0 index so must add 1
                         req = realloc(req, sizeof(Request) + req->buflen);
                         memset(req->buf, 0, req->buflen);
@@ -567,11 +620,8 @@ void *server_loop(void *arg) {
                             e_ptr++;
                             char_count--;
                         }
-                        Request_tracker_node *rtn = (Request_tracker_node *)malloc(sizeof(Request_tracker_node));
-                        if(rtn == NULL) {
-                            perror("malloc");
-                            exit(EXIT_FAILURE);
-                        }
+//                        Request_tracker_node *rtn = (Request_tracker_node *)malloc(sizeof(Request_tracker_node));
+                        Request_tracker_node *rtn;
                         pthread_mutex_lock(args->inprog_lock);
                         if((rtn = req_tracker_ll_fetch(&args->inprog->req_ll_head, *req)) != NULL) {
                             // Realloc this rtn and copy buflen and buf into it, now it is complete
@@ -582,7 +632,6 @@ void *server_loop(void *arg) {
                             strcpy(rtn->req->buf, req->buf);
                             printf("After adding buffer:\n");
                             req_tracker_ll_print(&args->inprog->req_ll_head);
-                            exit(EXIT_SUCCESS);
                         } else {
                             printf("Request not contained within the linked list, exiting...\n");
                             exit(EXIT_FAILURE);
@@ -704,7 +753,6 @@ int main(int argc, char *argv[]) {
          * fill in details of Request
      */
 
-    int headersize = 32/*IP*/ + 16/*port*/ + 32 + 16 + 64 /*long long*/ + MAXPATH + 1 /*'\0'*/;
     char hostip[32];
     snprintf(hostip, 32, "%s", inet_ntoa(host_addr.addr.sin_addr));
     char hostpo[16];
@@ -715,9 +763,7 @@ int main(int argc, char *argv[]) {
         pthread_mutex_lock(&a_counter_lock);
         a_counter++; // only increment this on new request NOT each machine
         for(int i = 0; i < nrmachines; i++) {
-            char header[headersize + 5];
-            char size[sizeof(size_t)] = {0};
-            char flag = FREQ + '0';
+            char flag = FCNT + '0';
             char *payload = "This is the content"; // adds term char
             // create request
             Request *req = (Request *)malloc(sizeof(Request));
@@ -728,9 +774,10 @@ int main(int argc, char *argv[]) {
             pthread_mutex_unlock(&a_counter_lock);
             snprintf(req->path, MAXPATH, "/proc/net/dev");
 // 1064 bit    char *payload = "KKE9k7y0kPo9swmIeo9HrIty6MMER65NPoq5uzzoqfSterUjglE2xkoMuZhRelWcff2p341gHWwRZI59zNs0UGKSwfoP0bWCp4B6qjXs2kEBS1GMlsYcawhT6x8FHSTJ8IlZ28f8r039XwjrHK96t5wETDJKDBl8RiIqRdVScqFbXqRspZ7nAMCzPORaoPV1J7MDAiS60arBJroErz26hkcMTy1X6O1UPWAJ6AvaSvNeOHQ8rVNM2JP1cAKz2CtlJ2S1sw81BEHGJTjGrpkNhxDFxLMsOekRk03hD2rco6Aimj9ulQYzXWBpICB5wxzQAKGuQLlk4STrgTupCZWm2sElYdKc9sniJN4udV8RYGf5qQijhWHXarUT0vjI9GtMua6TgMyHaudhga6lIGeSzkOXiyzHFg7fKClzeTIeejfIBgB4JshAiK13YcOXrsQSK5mZOrBI2goiE82ONaF8pnJZT5xk2ZfW3JSgsl8XS0Sz5eGbcjPoaXHPkTLDQ6LyArOspyutik5S07mtrm5xdTYQTBzkouGhrCLiw1C8tlBbBF5uxqz8owWvaNXW9AXeTYyAGP8gzxknGMLVMxT5RmipcRaBXCMswiXRqFsUBkZhggrAQl5dQxOx8z7eZC69BbJvvjGSDksmVCBGhU0czpk5ivhQX3FgpjX2cJhAMDEWYjopkrF4YfEi3tnJDlA2aEfrPsdhxDnmWVdTQUBkSJrMX4gfl2GoUivkVKGXYisZOThd9RqMwVkJlPXNgin1dsOWPNRLvd13i4hTViMH41fSo0Laz1D75KSd2TRB97MVsz2uoYaTaKybm1PpUEATkBDXMNZNF6umlQkhqG0UjAWWH7CKYx5gq10xfgeADk1Kc3xW6KxLSuCvTSiTkX9B2q94B5H6pvF6I3g5cD7bpOJyVUE0lDFMjszvz7ZkBEIFFr8gDxdmYVFXFViSGQDZt9haUePdGXW8F7auDAKubg6KowIB1JYkVPAH98Pz7CcPzNZh8Y8BvF0n7qVxuqfD3stWS3PkZTyDmwuAj6bZ9fwkkNKj0Idml2mRWUTI"; // adds term char
-//            req->buflen = strlen(payload) + 1;
-//            req = realloc(req, sizeof(Request) + req->buflen);
-//            snprintf(req->buf, req->buflen, "%s", payload);
+            req->buflen = strlen(payload) + 1;
+            req = realloc(req, sizeof(Request) + req->buflen);
+            memset(req->buf, 0, sizeof(req->buflen));
+            snprintf(req->buf, req->buflen, "%s", payload);
             // everything inside Request now. Make into stream with bytes and flag now
 
             // Add to inprog
@@ -739,27 +786,8 @@ int main(int argc, char *argv[]) {
             req_tracker_ll_print(&inprog->req_ll_head);
             pthread_mutex_unlock(&inprog_lock);
 
-            // create header
-            snprintf(header, headersize + 5/*for '-'s*/, "%s-%s-%s-%hu-%llu-%s",
-                     hostip, // should be: inet_ntoa(host_addr.addr.sin_addr)
-                     hostpo, //            htons(host_addr.addr.sin_port)
-                     inet_ntoa(req->sender.addr.sin_addr),
-                     htons(req->sender.addr.sin_port),
-                     req->atomic_counter,
-                     req->path
-            );
-            size_t total_size = strlen(header); // rather than whole length if not totally filled
-            total_size += sizeof(char); // flag
-            total_size += 3; // - delimeter chars
-            // change size into char and get len
-            sprintf(size, "%zu", total_size);
-            total_size += strlen(size);
-            // add total
-            char *message = malloc(total_size); // for total_size var
-            snprintf(message, total_size, "%zu-%c-%s",
-                     total_size - 1,
-                     flag,
-                     header);
+            char *message = create_message(hostip, hostpo, req, HEADER, FREQ);
+
             if((err = send(connected_clients[i].sock_out, message, strlen(message), 0)) <= 0) {
                 if(err < 0) {
                     perror("send");

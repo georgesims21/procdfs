@@ -8,6 +8,7 @@
 
 #define FREQ 1
 #define FCNT 2
+#define HEADER 167 // 32 IP + 16 port + 32 + 16 + 64 /*long long*/ + MAXPATH + 1 /*'\0'*/ + 6 /*'-'s*/;
 
 int init_server(Address *address, int queue_length, int port_number, const char *interface);
 /*
@@ -111,46 +112,6 @@ static int pconnect(Address *addrarr, int arrlen, Address *newaddr);
 static int contained_within(Address *addr, Address lookup, int arrlen);
 static void paccept(Address host_addr, Address *client_addr);
 static int search_IPs(in_addr_t conn, const char *filename);
-
-/*
- * struct extract_file_request_args {
- *      struct Request *fr; (malloc'ed)
- *      struct Address host_addr;
- * };
- */
-
-/*
- * STATIC extract_file_request - by server thread n
- * @param   void* - pass extract_file_request_args struct
- * @ret     NULL
- *
- * save IP into fr->address->...->sin_addr
- * save port into fr->...->sin_port
- * save host IP and port
- * make sure they match our credentials
- * save path into fr->...
- * save counter into fr->...
- */
-
-/*
- * struct extract_file_content_args {
- *      struct Request *fr; (malloc'ed)
- *      struct Address host_addr;
- * };
- */
-
-/*
- * STATIC extract_file_content - by server thread n
- * @param   void* - pass extract_file_content_args struct
- * @ret     NULL
- *
- * save IP into fr->address->...->sin_addr
- * save port into fr->...->sin_port
- * save host IP and port
- * make sure they match our credentials
- * save path
- * save counter
- */
 
 /*
  * struct create_request_args {
