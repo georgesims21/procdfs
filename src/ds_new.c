@@ -124,6 +124,26 @@ int request_ll_free(Request_tracker_node **head) {
     return 0;
 }
 
+int request_ll_complete(Request_tracker_node **head) {
+
+    Request_tracker_node *reqptr = *head;
+    Request_tracker_node *next;
+    int count = 0;
+    if(reqptr == NULL) {
+        printf("The list is empty! Not freeing anything\n");
+        return -1;
+    }
+    while(reqptr != NULL) {
+        if(reqptr->req != NULL) {
+            if(reqptr->req->complete)
+                count++;
+        }
+        next = reqptr->next;
+        reqptr = next;
+    }
+    return count;
+}
+
 void inprog_reset(Inprog *inp) {
 
     request_ll_free(&inp->req_ll_head);

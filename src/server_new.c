@@ -360,10 +360,11 @@ int procsizefd(int fd) {
 char *create_message(char *hostip, char *hostport, Request *req, int headerlen, int flag) {
     if(req->sender.addr.sin_addr.s_addr == 0 || (0 > flag && flag > 3))
         return NULL;
-    char header[headerlen + 5];
+    char header[HEADER] = {0};
     char size[sizeof(size_t)] = {0};
     // create header
-    snprintf(header, headerlen, "%s-%s-%s-%hu-%llu-%s-",
+    snprintf(header, HEADER, "%d-%s-%s-%s-%hu-%llu-%s-",
+             flag,
              hostip,
              hostport,
              inet_ntoa(req->sender.addr.sin_addr),
@@ -371,28 +372,34 @@ char *create_message(char *hostip, char *hostport, Request *req, int headerlen, 
              req->atomic_counter,
              req->path
     );
-    size_t total_size = strlen(header); // rather than whole length if not totally filled
-    total_size += sizeof(char); // flag
-    total_size += 2; // - delimeter chars
+    size_t total_size = strlen(header); // doing another snprintf so don't add term char
     total_size += (flag == FCNT) ? req->buflen : 0;
     // change size into char and get len
     sprintf(size, "%zu", total_size);
-    total_size += strlen(size);
     // add total
-    char *message = malloc(total_size + 1); // add term char
+    size_t stlen = total_size + strlen(size) + 2; // for term char and delim
+    char *message = malloc(stlen);
     if(flag == FCNT) {
-        snprintf(message, total_size, "%zu-%d-%s%s",
-                 total_size - 1,
-                 flag,
+        snprintf(message, stlen, "%zu-%s%s",
+                 total_size,
                  header,
                  req->buf);
     } else {
-        snprintf(message, total_size, "%zu-%d-%s",
-                 total_size - 1,
-                 flag,
+        snprintf(message, stlen, "%zu-%s",
+                 total_size,
                  header);
     }
     return message;
+}
+
+int fetch_upto_delim(char **bufptr, char *buf, int *char_count) {
+    while(*(*bufptr) != '-') {
+        strncat(buf, *bufptr, 1);
+        *(*bufptr)++;
+        (*char_count)--;
+    }
+    *(*bufptr)++;
+    return 0;
 }
 
 void *server_loop(void *arg) {
@@ -445,11 +452,13 @@ void *server_loop(void *arg) {
                      * Going to need the inprog_tracker_node ll as global so fuse can access
                  */
                 int read_bytes = recv(pfds[i].fd, buf, sizeof(size_t), 0); // assuming we read 8 bytes and not less
+                printf("Received %d bytes\n", read_bytes);
                 if(read_bytes <= 0) {
                     get_time(tb);
                     printf("[thread: %ld {%s}] disconnection, exiting..\n", syscall(__NR_gettid), tb);
                     exit(EXIT_SUCCESS);
                 }
+                char *e_ptr = tmp;
                 while(buf[counter] != '-') {
                     strncat(len, &buf[counter], 1);
                     counter++;
@@ -459,8 +468,7 @@ void *server_loop(void *arg) {
                 int total = atoi(len); // quick and dirty, change to strtol later
                 // save after '-' into tmp
                 memcpy(tmp, &buf[counter], read_bytes - counter); // get whatever is left from first buf and save it
-                int rem_bytes = total - read_bytes; // already read 8 bytes
-                int total_wo_size = total - (read_bytes + counter);
+                int rem_bytes = total - read_bytes + counter; // already read 8 bytes, but size not included in total
                 while(rem_bytes > 0) {
                     // could have new var from recv and use that in an strncat
                     rem_bytes -= recv(pfds[i].fd, buf, rem_bytes, 0);
@@ -488,57 +496,20 @@ void *server_loop(void *arg) {
                 char path[MAXPATH] = {0};
                 char buffer[2048] = {0};
                 // google how to deconstruct a buffer efficiently
-                char *e_ptr = tmp;
-                int char_count = total_wo_size;
-                // flag
+                int char_count = total;
                 while(*e_ptr != '-') {
                     flag = *e_ptr - '0';
                     e_ptr++;
                     char_count--;
                 }
                 e_ptr++;
-                // senderIP
-                while(*e_ptr != '-') {
-                    strncat(senderIP, e_ptr, 1);
-                    e_ptr++;
-                    char_count--;
-                }
-                e_ptr++;
-                // senderPort
-                while(*e_ptr != '-') {
-                    strncat(senderPort, e_ptr, 1);
-                    e_ptr++;
-                    char_count--;
-                }
-                e_ptr++;
-                // hostIP
-                while(*e_ptr != '-') {
-                    strncat(hostIP, e_ptr, 1);
-                    e_ptr++;
-                    char_count--;
-                }
-                e_ptr++;
-                // hostPort
-                while(*e_ptr != '-') {
-                    strncat(hostPort, e_ptr, 1);
-                    e_ptr++;
-                    char_count--;
-                }
-                e_ptr++;
-                // a_counter
-                while(*e_ptr != '-') {
-                    strncat(a_counter, e_ptr, 1);
-                    e_ptr++;
-                    char_count--;
-                }
-                e_ptr++;
-                // path
-                while(*e_ptr != '-' && char_count >= -1) { // TODO: this -1 is not OK
-                    strncat(path, e_ptr, 1);
-                    e_ptr++;
-                    char_count--;
-                }
-                e_ptr++;
+                // flag
+                fetch_upto_delim(&e_ptr, senderIP, &char_count);
+                fetch_upto_delim(&e_ptr, senderPort, &char_count);
+                fetch_upto_delim(&e_ptr, hostIP, &char_count);
+                fetch_upto_delim(&e_ptr, hostPort, &char_count);
+                fetch_upto_delim(&e_ptr, a_counter, &char_count);
+                fetch_upto_delim(&e_ptr, path, &char_count);
 
                 host.addr.sin_addr.s_addr = inet_addr(hostIP);
                 int hp = atoi(hostPort);
@@ -589,12 +560,13 @@ void *server_loop(void *arg) {
                         req = realloc(req, sizeof(Request) + req->buflen);
                         memset(req->buf, 0, sizeof(req->buflen));
                         snprintf(req->buf, req->buflen, "%s", procbuf);
-                        printf("buff: %s", procbuf);
 
                         // send the req back to the sender
                         char *message = create_message(hostIP, hostPort, req, HEADER, FCNT);
+                        printf("FCNT Sending: %s\n", message);
+
                         int err = 0;
-                        if((err = send(req->sender.sock_out, message, strlen(message), 0)) <= 0) {
+                        if((err = send(req->sender.sock_out, message, strlen(message) + 1, 0)) <= 0) {
                             if(err < 0) {
                                 perror("send");
                             }
@@ -630,8 +602,15 @@ void *server_loop(void *arg) {
                             rtn->req = realloc(rtn->req, sizeof(Request) + req->buflen);
                             memset(rtn->req->buf, 0, req->buflen);
                             strcpy(rtn->req->buf, req->buf);
+                            rtn->req->complete = true;
                             printf("After adding buffer:\n");
                             req_tracker_ll_print(&args->inprog->req_ll_head);
+                            // check if all requests (inc. this one) have been received
+                            if(request_ll_complete(&args->inprog->req_ll_head) == args->inprog->messages_sent) {
+                                args->inprog->complete = true;
+                                printf("All messages received! Resetting inprog\n");
+                                inprog_reset(args->inprog);
+                            }
                         } else {
                             printf("Request not contained within the linked list, exiting...\n");
                             exit(EXIT_FAILURE);
@@ -763,32 +742,26 @@ int main(int argc, char *argv[]) {
         pthread_mutex_lock(&a_counter_lock);
         a_counter++; // only increment this on new request NOT each machine
         for(int i = 0; i < nrmachines; i++) {
-            char flag = FCNT + '0';
-            char *payload = "This is the content"; // adds term char
             // create request
             Request *req = (Request *)malloc(sizeof(Request));
             memset(req, 0, sizeof(Request));
             // fill in request struct with info
             req->sender = connected_clients[i];
-            req->atomic_counter = a_counter;
+            req->atomic_counter = inprog->atomic_counter = a_counter;
             pthread_mutex_unlock(&a_counter_lock);
             snprintf(req->path, MAXPATH, "/proc/net/dev");
-// 1064 bit    char *payload = "KKE9k7y0kPo9swmIeo9HrIty6MMER65NPoq5uzzoqfSterUjglE2xkoMuZhRelWcff2p341gHWwRZI59zNs0UGKSwfoP0bWCp4B6qjXs2kEBS1GMlsYcawhT6x8FHSTJ8IlZ28f8r039XwjrHK96t5wETDJKDBl8RiIqRdVScqFbXqRspZ7nAMCzPORaoPV1J7MDAiS60arBJroErz26hkcMTy1X6O1UPWAJ6AvaSvNeOHQ8rVNM2JP1cAKz2CtlJ2S1sw81BEHGJTjGrpkNhxDFxLMsOekRk03hD2rco6Aimj9ulQYzXWBpICB5wxzQAKGuQLlk4STrgTupCZWm2sElYdKc9sniJN4udV8RYGf5qQijhWHXarUT0vjI9GtMua6TgMyHaudhga6lIGeSzkOXiyzHFg7fKClzeTIeejfIBgB4JshAiK13YcOXrsQSK5mZOrBI2goiE82ONaF8pnJZT5xk2ZfW3JSgsl8XS0Sz5eGbcjPoaXHPkTLDQ6LyArOspyutik5S07mtrm5xdTYQTBzkouGhrCLiw1C8tlBbBF5uxqz8owWvaNXW9AXeTYyAGP8gzxknGMLVMxT5RmipcRaBXCMswiXRqFsUBkZhggrAQl5dQxOx8z7eZC69BbJvvjGSDksmVCBGhU0czpk5ivhQX3FgpjX2cJhAMDEWYjopkrF4YfEi3tnJDlA2aEfrPsdhxDnmWVdTQUBkSJrMX4gfl2GoUivkVKGXYisZOThd9RqMwVkJlPXNgin1dsOWPNRLvd13i4hTViMH41fSo0Laz1D75KSd2TRB97MVsz2uoYaTaKybm1PpUEATkBDXMNZNF6umlQkhqG0UjAWWH7CKYx5gq10xfgeADk1Kc3xW6KxLSuCvTSiTkX9B2q94B5H6pvF6I3g5cD7bpOJyVUE0lDFMjszvz7ZkBEIFFr8gDxdmYVFXFViSGQDZt9haUePdGXW8F7auDAKubg6KowIB1JYkVPAH98Pz7CcPzNZh8Y8BvF0n7qVxuqfD3stWS3PkZTyDmwuAj6bZ9fwkkNKj0Idml2mRWUTI"; // adds term char
-            req->buflen = strlen(payload) + 1;
-            req = realloc(req, sizeof(Request) + req->buflen);
-            memset(req->buf, 0, sizeof(req->buflen));
-            snprintf(req->buf, req->buflen, "%s", payload);
-            // everything inside Request now. Make into stream with bytes and flag now
-
             // Add to inprog
             pthread_mutex_lock(&inprog_lock);
             req_tracker_ll_add(&inprog->req_ll_head, req);
+            inprog->messages_sent++;
+            inprog->complete = false;
             req_tracker_ll_print(&inprog->req_ll_head);
             pthread_mutex_unlock(&inprog_lock);
 
             char *message = create_message(hostip, hostpo, req, HEADER, FREQ);
+            printf("FREQ Sending: %s\n", message);
 
-            if((err = send(connected_clients[i].sock_out, message, strlen(message), 0)) <= 0) {
+            if((err = send(req->sender.sock_out, message, strlen(message), 0)) <= 0) {
                 if(err < 0) {
                     perror("send");
                 }
@@ -797,7 +770,7 @@ int main(int argc, char *argv[]) {
             } else {
                 get_time(tb);
                 printf("[thread: %ld {%s}] sent %d bytes to %s @ sock_out: %d\n", syscall(__NR_gettid),
-                       tb, err, inet_ntoa(connected_clients[i].addr.sin_addr), connected_clients[i].sock_out);
+                       tb, err, inet_ntoa(req->sender.addr.sin_addr), req->sender.sock_out);
             }
             free(message);
         } // END of write for loop

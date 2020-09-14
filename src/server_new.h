@@ -8,7 +8,7 @@
 
 #define FREQ 1
 #define FCNT 2
-#define HEADER 167 // 32 IP + 16 port + 32 + 16 + 64 /*long long*/ + MAXPATH + 1 /*'\0'*/ + 6 /*'-'s*/;
+#define HEADER 166 // 32 IP + 16 port + 32 + 16 + 64 /*long long*/ + MAXPATH + 1 /*'\0'*/ + 7 /*'-'s*/;
 
 int init_server(Address *address, int queue_length, int port_number, const char *interface);
 /*

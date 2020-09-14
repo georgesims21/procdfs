@@ -17,6 +17,7 @@ typedef struct address {
 typedef struct request {
     Address sender;
     long long atomic_counter;
+    bool complete;
     char path[MAXPATH];
     unsigned long buflen;
     char buf[]; // to allow for flexible array member
@@ -28,7 +29,7 @@ typedef struct request_tracker_node {
 }Request_tracker_node;
 
 typedef struct inprog {
-    int atomic_counter;
+    long long atomic_counter;
     int messages_sent;
     bool complete;
     Request_tracker_node *req_ll_head; // head of linked list of the machines who got message
@@ -50,5 +51,6 @@ int request_ll_free(Request_tracker_node **head);
  * the inprog tracker linked list at a later time
  */
 void inprog_reset(Inprog *inp);
+int request_ll_complete(Request_tracker_node **head);
 
 #endif //PROCSYS_DS_NEW_H
