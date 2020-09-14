@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <arpa/inet.h>
+#include <pthread.h>
 
 int req_tracker_ll_add(Request_tracker_node **head, Request *req) {
 
@@ -142,6 +143,34 @@ int request_ll_complete(Request_tracker_node **head) {
         reqptr = next;
     }
     return count;
+}
+
+int inprog_add_buf(Request *req, Inprog *inprog, pthread_mutex_t *inprog_lock) {
+
+    Request_tracker_node *rtn;
+    pthread_mutex_lock(inprog_lock);
+    if((rtn = req_tracker_ll_fetch(&inprog->req_ll_head, *req)) != NULL) {
+        // Realloc this rtn and copy buflen and buf into it, now it is complete
+        printf("Request found!\n");
+        rtn->req->buflen = req->buflen;
+        rtn->req = realloc(rtn->req, sizeof(Request) + req->buflen);
+        memset(rtn->req->buf, 0, req->buflen);
+        strcpy(rtn->req->buf, req->buf);
+        rtn->req->complete = true;
+        printf("After adding buffer:\n");
+        req_tracker_ll_print(&inprog->req_ll_head);
+        // check if all requests (inc. this one) have been received
+        if(request_ll_complete(&inprog->req_ll_head) == inprog->messages_sent) {
+            inprog->complete = true;
+            printf("All messages received! Resetting inprog\n");
+            inprog_reset(inprog);
+        }
+    } else {
+        printf("Request not contained within the linked list, exiting...\n");
+        exit(EXIT_FAILURE);
+    }
+    pthread_mutex_unlock(inprog_lock);
+    return 0;
 }
 
 void inprog_reset(Inprog *inp) {

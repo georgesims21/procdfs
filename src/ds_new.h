@@ -52,5 +52,6 @@ int request_ll_free(Request_tracker_node **head);
  */
 void inprog_reset(Inprog *inp);
 int request_ll_complete(Request_tracker_node **head);
+int inprog_add_buf(Request *req, Inprog *inprog, pthread_mutex_t *inprog_lock);
 
 #endif //PROCSYS_DS_NEW_H

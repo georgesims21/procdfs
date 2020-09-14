@@ -504,7 +504,7 @@ void *server_loop(void *arg) {
                  */
                 char contentbuf[4000] = {0};
                 char *e_ptr = contentbuf;
-                int counter = 0, readbytes = 0;
+                int counter = 0, readbytes = 0, flag = 0;
                 Request *req = (Request *)malloc(sizeof(Request));
                 memset(req, 0, sizeof(Request));
                 char *buf = calloc(0, sizeof(size_t) + 1);
@@ -530,15 +530,12 @@ void *server_loop(void *arg) {
                 printf("[thread: %ld {%s}] (%d) bytes received: %s\n", syscall(__NR_gettid), tb,
                        total, contentbuf);
                 // now we have a request struct we can switch for what we need
-                int flag = 0;
                 extract_buffer(&e_ptr, &char_count, req, args->host_addr, args->conn_clients,
                                args->conn_clients_lock, &flag, args->arrlen);
-
-                // by here need flag, req
                 switch(flag) {
                     case FREQ: { // 1: other machine requesting file content
                         printf("File request received\n");
-                        int fd = -1, res = 0, offset = 0, size = 0;
+                        int fd = -1, res = 0, offset = 0, size = 0, err = 0;
                         fd = openat(AT_FDCWD, req->path, O_RDONLY);
                         if (fd == -1) {
                             perror("openat");
@@ -557,12 +554,10 @@ void *server_loop(void *arg) {
                         req = realloc(req, sizeof(Request) + req->buflen);
                         memset(req->buf, 0, sizeof(req->buflen));
                         snprintf(req->buf, req->buflen, "%s", procbuf);
-
+                        free(procbuf);
                         // send the req back to the sender
                         char *message = create_message(args->host_addr, req, HEADER, FCNT);
                         printf("FCNT Sending: %s\n", message);
-
-                        int err = 0;
                         if((err = send(req->sender.sock_out, message, strlen(message) + 1, 0)) <= 0) {
                             if(err < 0) {
                                 perror("send");
@@ -575,7 +570,6 @@ void *server_loop(void *arg) {
                                    tb, err, inet_ntoa(req->sender.addr.sin_addr), req->sender.sock_out);
                         }
                         free(message);
-                        free(procbuf);
                         break;
                     }
                     case FCNT: // 2: this machine receiving a response with content
@@ -589,41 +583,13 @@ void *server_loop(void *arg) {
                             e_ptr++;
                             char_count--;
                         }
-//                        Request_tracker_node *rtn = (Request_tracker_node *)malloc(sizeof(Request_tracker_node));
-                        Request_tracker_node *rtn;
-                        pthread_mutex_lock(args->inprog_lock);
-                        if((rtn = req_tracker_ll_fetch(&args->inprog->req_ll_head, *req)) != NULL) {
-                            // Realloc this rtn and copy buflen and buf into it, now it is complete
-                            printf("Request found!\n");
-                            rtn->req->buflen = req->buflen;
-                            rtn->req = realloc(rtn->req, sizeof(Request) + req->buflen);
-                            memset(rtn->req->buf, 0, req->buflen);
-                            strcpy(rtn->req->buf, req->buf);
-                            rtn->req->complete = true;
-                            printf("After adding buffer:\n");
-                            req_tracker_ll_print(&args->inprog->req_ll_head);
-                            // check if all requests (inc. this one) have been received
-                            if(request_ll_complete(&args->inprog->req_ll_head) == args->inprog->messages_sent) {
-                                args->inprog->complete = true;
-                                printf("All messages received! Resetting inprog\n");
-                                inprog_reset(args->inprog);
-                            }
-                        } else {
-                            printf("Request not contained within the linked list, exiting...\n");
-                            exit(EXIT_FAILURE);
-                        }
-                        pthread_mutex_unlock(args->inprog_lock);
+                        inprog_add_buf(req, args->inprog, args->inprog_lock);
                         break;
                     default:
                         break;
                 }
                 free(req);
                 free(buf);
-
-//                exit(EXIT_SUCCESS);
-
-
-
             }
         } // END of poll loop
     } // END of inf for loop
