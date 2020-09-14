@@ -402,6 +402,46 @@ int fetch_upto_delim(char **bufptr, char *buf, int *char_count) {
     return 0;
 }
 
+int fetch_size(char *buf, int *counter) {
+    char size[sizeof(size_t)] = {0};
+    while(buf[*counter] != '-') {
+        strncat(size, &buf[*counter], 1);
+        (*counter)++;
+    }
+    (*counter)++; // account for the '-' we discard
+    // here len should have string containing total length to read
+    int total = atoi(size); // quick and dirty, change to strtol later
+    return total;
+}
+
+int extract_header(char **bufptr, int *char_count, Request *req, Address host_addr) {
+    char senderIP[32] = {0};
+    char senderPort[16] = {0};
+    char hostIP[32] = {0};
+    char hostPort[16] = {0};
+    char a_counter[8] = {0};
+    char path[MAXPATH] = {0};
+
+    fetch_upto_delim(bufptr, senderIP, char_count);
+    fetch_upto_delim(bufptr, senderPort, char_count);
+    fetch_upto_delim(bufptr, hostIP, char_count);
+    fetch_upto_delim(bufptr, hostPort, char_count);
+    // check whether given hostIP matches actual
+    if(!(inet_addr(hostIP) == host_addr.addr.sin_addr.s_addr) ||
+       !(htons(atoi(hostPort)) == host_addr.addr.sin_port)) {
+        printf("Doesn't match the hostIP address and port, exiting...\n");
+        exit(EXIT_FAILURE);
+    }
+    fetch_upto_delim(bufptr, a_counter, char_count);
+    fetch_upto_delim(bufptr, path, char_count);
+
+    req->sender.addr.sin_addr.s_addr = inet_addr(senderIP);
+    req->sender.addr.sin_port = htons(atoi(senderPort));
+    req->atomic_counter = strtoll(a_counter, NULL, 10);
+    strncpy(req->path, path, strlen(path));
+    return 0;
+}
+
 void *server_loop(void *arg) {
 
     struct server_loop_args *args = (struct server_loop_args *)arg;
@@ -421,28 +461,7 @@ void *server_loop(void *arg) {
         for(unsigned int i = 0; i < fdcount; i++) {
             if(pfds[i].revents & POLLIN) {
                 // reading from already connected client
-                char buf[4000] = {0};
-                char tmp[4000] = {0};
-                char len[sizeof(size_t)] = {0};
-                int counter = 0, readbytes = 0;
                 /*
-                 * DONE
-                     * extract until - delimiter and save as size_t msglen
-                         * read sizeof(size_t)
-                         * pointer to string
-                         * move pointer one by one to find '-'
-                             * each char append to new buf
-                             * strncmp
-                             * convert this to size_t variable
-                     * read until that amount is 0
-                     * begin to deconstruct
-                         * flag
-                         * senderIP and senderPort
-                         * hostIP and hostPort - error check
-                         * atomic counter
-                         * path
-                         * buf (size: msglen - HEADER) - can be 0 if filereq
-                     * Save into Request
                  * TODO
                      * switch
                          * 1: file request
@@ -450,7 +469,12 @@ void *server_loop(void *arg) {
                          * 2: content received
                              * (extra) make into void method
                      * Going to need the inprog_tracker_node ll as global so fuse can access
+                     * should read size_t + 1 in case it is MAX long long and 8 bytes doesn't include '-'
                  */
+                int counter = 0, readbytes = 0, flag = 0;
+                char *buf = malloc(sizeof(size_t));
+                Request *req = (Request *)malloc(sizeof(Request));
+                memset(req, 0, sizeof(Request));
                 int read_bytes = recv(pfds[i].fd, buf, sizeof(size_t), 0); // assuming we read 8 bytes and not less
                 printf("Received %d bytes\n", read_bytes);
                 if(read_bytes <= 0) {
@@ -458,44 +482,26 @@ void *server_loop(void *arg) {
                     printf("[thread: %ld {%s}] disconnection, exiting..\n", syscall(__NR_gettid), tb);
                     exit(EXIT_SUCCESS);
                 }
-                char *e_ptr = tmp;
-                while(buf[counter] != '-') {
-                    strncat(len, &buf[counter], 1);
-                    counter++;
+                int total = fetch_size(buf, &counter);
+                if(total < 0) {
+                    printf("Couldn't fetch size, exiting...\n");
+                    exit(EXIT_FAILURE);
                 }
-                counter++; // account for the '-' we discard
-                // here len should have string containing total length to read
-                int total = atoi(len); // quick and dirty, change to strtol later
                 // save after '-' into tmp
-                memcpy(tmp, &buf[counter], read_bytes - counter); // get whatever is left from first buf and save it
+                buf = realloc(buf, total + 1); // not sure about + 1
+                char *final_buf = calloc(0, total + 1 );
+                char *e_ptr = final_buf;
+                memcpy(final_buf, &buf[counter], read_bytes - counter); // get whatever is left from first buf and save it
                 int rem_bytes = total - read_bytes + counter; // already read 8 bytes, but size not included in total
                 while(rem_bytes > 0) {
                     // could have new var from recv and use that in an strncat
                     rem_bytes -= recv(pfds[i].fd, buf, rem_bytes, 0);
-                    strcat(tmp, buf);
+                    strcat(final_buf, buf);
                 }
-                get_time(tb);
-                printf("[thread: %ld {%s}] (%d) bytes received: %s\n", syscall(__NR_gettid), tb,
-                       total, tmp);
+//                get_time(tb);
+//                printf("[thread: %ld {%s}] (%d) bytes received: %s\n", syscall(__NR_gettid), tb,
+//                       total, final_buf);
                 // here need to start extracting
-                Address sender = {0};
-                Address host = {0};
-                Request *req = (Request *)malloc(sizeof(Request));
-                if(req == NULL) {
-                    perror("malloc");
-                    exit(EXIT_FAILURE);
-                }
-                memset(req, 0, sizeof(Request));
-                int cptr = 0, delim = 0;
-                int flag = 0;
-                char senderIP[32] = {0};
-                char senderPort[16] = {0};
-                char hostIP[32] = {0};
-                char hostPort[16] = {0};
-                char a_counter[8] = {0};
-                char path[MAXPATH] = {0};
-                char buffer[2048] = {0};
-                // google how to deconstruct a buffer efficiently
                 int char_count = total;
                 while(*e_ptr != '-') {
                     flag = *e_ptr - '0';
@@ -503,52 +509,29 @@ void *server_loop(void *arg) {
                     char_count--;
                 }
                 e_ptr++;
-                // flag
-                fetch_upto_delim(&e_ptr, senderIP, &char_count);
-                fetch_upto_delim(&e_ptr, senderPort, &char_count);
-                fetch_upto_delim(&e_ptr, hostIP, &char_count);
-                fetch_upto_delim(&e_ptr, hostPort, &char_count);
-                fetch_upto_delim(&e_ptr, a_counter, &char_count);
-                fetch_upto_delim(&e_ptr, path, &char_count);
-
-                host.addr.sin_addr.s_addr = inet_addr(hostIP);
-                int hp = atoi(hostPort);
-                host.addr.sin_port = htons(hp);
-
-                // check whether given hostIP matches actual
-                if(!(sender.addr.sin_addr.s_addr == args->host_addr.addr.sin_addr.s_addr) &&
-                !(host.addr.sin_port == args->host_addr.addr.sin_port)) {
-                    printf("Doesn't match the hostIP address and port, exiting...\n");
-                    exit(EXIT_FAILURE);
-                }
-
-                // check whether sender is inside conn_cli array
-                sender.addr.sin_addr.s_addr = inet_addr(senderIP);
-                int sp = atoi(senderPort);
-                sender.addr.sin_port = htons(sp);
+                extract_header(&e_ptr, &char_count, req, args->host_addr);
                 pthread_mutex_lock(args->conn_clients_lock);
                 // use this to find variable in conn_cli, make copy once found
-                if((contained_within_ret(args->conn_clients, &sender, args->arrlen)) == -1) {
+                if((contained_within_ret(args->conn_clients, &req->sender, args->arrlen)) == -1) {
                     printf("Couldn't find sender address within conn_cli array, exiting..\n");
                     exit(EXIT_FAILURE);
                 }
                 pthread_mutex_unlock(args->conn_clients_lock);
-                req->sender = sender;
-                req->atomic_counter = strtoll(a_counter, NULL, 10);
-                strncpy(req->path, path, strlen(path));
-                // now we have a request struct we can switch for what we need
-
                 switch(flag) {
                     case FREQ: { // 1: other machine requesting file content
                         printf("File request received\n");
                         int fd = -1, res = 0, offset = 0, size = 0;
+                        char hostip[32];
+                        snprintf(hostip, 32, "%s", inet_ntoa(args->host_addr.addr.sin_addr));
+                        char hostpo[16];
+                        snprintf(hostpo, 16, "%d", htons(args->host_addr.addr.sin_port));
                         fd = openat(AT_FDCWD, req->path, O_RDONLY);
                         if (fd == -1) {
                             perror("openat");
                             exit (EXIT_FAILURE);
                         }
                         size = procsizefd(fd);
-                        char *procbuf = malloc(sizeof(char) * size);
+                        char *procbuf = calloc(0, size + 1);
                         printf("procsize: %d\n", size);
 
                         res = pread(fd, procbuf, size, offset);
@@ -562,7 +545,7 @@ void *server_loop(void *arg) {
                         snprintf(req->buf, req->buflen, "%s", procbuf);
 
                         // send the req back to the sender
-                        char *message = create_message(hostIP, hostPort, req, HEADER, FCNT);
+                        char *message = create_message(hostip, hostpo, req, HEADER, FCNT);
                         printf("FCNT Sending: %s\n", message);
 
                         int err = 0;
@@ -579,6 +562,8 @@ void *server_loop(void *arg) {
                         }
                         free(message);
                         free(procbuf);
+                        free(buf);
+                        free(final_buf);
                         break;
                     }
                     case FCNT: // 2: this machine receiving a response with content
@@ -716,13 +701,6 @@ int main(int argc, char *argv[]) {
     pthread_mutex_t a_counter_lock = PTHREAD_MUTEX_INITIALIZER;
     char buf[1024];
     Address ad;
-//    int headersize = (strlen(inet_ntoa(host_addr.addr.sin_addr)) +
-//            sizeof(htons(host_addr.addr.sin_port)) +
-//            strlen(inet_ntoa(ad.addr.sin_addr)) +
-//            sizeof(htons(ad.addr.sin_port)) +
-//            sizeof(a_counter) +
-//            MAXPATH
-//            );
 
     /*
      * TODO
