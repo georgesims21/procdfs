@@ -357,7 +357,11 @@ int procsizefd(int fd) {
     return count;
 }
 
-char *create_message(char *hostip, char *hostport, Request *req, int headerlen, int flag) {
+char *create_message(Address host_addr, Request *req, int headerlen, int flag) {
+    char hostip[32];
+    snprintf(hostip, 32, "%s", inet_ntoa(host_addr.addr.sin_addr));
+    char hostpo[16];
+    snprintf(hostpo, 16, "%d", htons(host_addr.addr.sin_port));
     if(req->sender.addr.sin_addr.s_addr == 0 || (0 > flag && flag > 3))
         return NULL;
     char header[HEADER] = {0};
@@ -366,7 +370,7 @@ char *create_message(char *hostip, char *hostport, Request *req, int headerlen, 
     snprintf(header, HEADER, "%d-%s-%s-%s-%hu-%llu-%s-",
              flag,
              hostip,
-             hostport,
+             hostpo,
              inet_ntoa(req->sender.addr.sin_addr),
              htons(req->sender.addr.sin_port),
              req->atomic_counter,
@@ -442,6 +446,33 @@ int extract_header(char **bufptr, int *char_count, Request *req, Address host_ad
     return 0;
 }
 
+int extract_flag(char **bufptr, int *char_count) {
+    // flag
+    int flag = -1;
+    while(*(*bufptr) != '-') {
+        flag = *(*bufptr) - '0';
+        *(*bufptr)++;
+        (*char_count)--;
+    }
+    *(*bufptr)++;
+    return flag;
+}
+
+int extract_buffer(char **bufptr, int *char_count, Request *req, Address host_addr, Address *conn_clients,
+                     pthread_mutex_t *conn_clients_lock, int *flag, int arrlen) {
+
+    *flag = extract_flag(bufptr, char_count);
+    extract_header(bufptr, char_count, req, host_addr);
+    pthread_mutex_lock(conn_clients_lock);
+    // use this to find variable in conn_cli, make copy once found
+    if((contained_within_ret(conn_clients, &req->sender, arrlen)) == -1) {
+        printf("Couldn't find sender address within conn_cli array, exiting..\n");
+        exit(EXIT_FAILURE);
+    }
+    pthread_mutex_unlock(conn_clients_lock);
+    return 0;
+}
+
 void *server_loop(void *arg) {
 
     struct server_loop_args *args = (struct server_loop_args *)arg;
@@ -469,12 +500,14 @@ void *server_loop(void *arg) {
                          * 2: content received
                              * (extra) make into void method
                      * Going to need the inprog_tracker_node ll as global so fuse can access
-                     * should read size_t + 1 in case it is MAX long long and 8 bytes doesn't include '-'
+                     * cannot calloc/malloc tmp unless it is over 4000.. no idea why
                  */
-                int counter = 0, readbytes = 0, flag = 0;
-                char *buf = malloc(sizeof(size_t));
+                char contentbuf[4000] = {0};
+                char *e_ptr = contentbuf;
+                int counter = 0, readbytes = 0;
                 Request *req = (Request *)malloc(sizeof(Request));
                 memset(req, 0, sizeof(Request));
+                char *buf = calloc(0, sizeof(size_t) + 1);
                 int read_bytes = recv(pfds[i].fd, buf, sizeof(size_t), 0); // assuming we read 8 bytes and not less
                 printf("Received %d bytes\n", read_bytes);
                 if(read_bytes <= 0) {
@@ -483,55 +516,36 @@ void *server_loop(void *arg) {
                     exit(EXIT_SUCCESS);
                 }
                 int total = fetch_size(buf, &counter);
-                if(total < 0) {
-                    printf("Couldn't fetch size, exiting...\n");
-                    exit(EXIT_FAILURE);
-                }
+                int char_count = total;
+                buf = realloc(buf, total + 1);
                 // save after '-' into tmp
-                buf = realloc(buf, total + 1); // not sure about + 1
-                char *final_buf = calloc(0, total + 1 );
-                char *e_ptr = final_buf;
-                memcpy(final_buf, &buf[counter], read_bytes - counter); // get whatever is left from first buf and save it
+                strncpy(contentbuf, &buf[counter], read_bytes - counter);
                 int rem_bytes = total - read_bytes + counter; // already read 8 bytes, but size not included in total
                 while(rem_bytes > 0) {
                     // could have new var from recv and use that in an strncat
                     rem_bytes -= recv(pfds[i].fd, buf, rem_bytes, 0);
-                    strcat(final_buf, buf);
+                    strcat(contentbuf, buf);
                 }
-//                get_time(tb);
-//                printf("[thread: %ld {%s}] (%d) bytes received: %s\n", syscall(__NR_gettid), tb,
-//                       total, final_buf);
-                // here need to start extracting
-                int char_count = total;
-                while(*e_ptr != '-') {
-                    flag = *e_ptr - '0';
-                    e_ptr++;
-                    char_count--;
-                }
-                e_ptr++;
-                extract_header(&e_ptr, &char_count, req, args->host_addr);
-                pthread_mutex_lock(args->conn_clients_lock);
-                // use this to find variable in conn_cli, make copy once found
-                if((contained_within_ret(args->conn_clients, &req->sender, args->arrlen)) == -1) {
-                    printf("Couldn't find sender address within conn_cli array, exiting..\n");
-                    exit(EXIT_FAILURE);
-                }
-                pthread_mutex_unlock(args->conn_clients_lock);
+                get_time(tb);
+                printf("[thread: %ld {%s}] (%d) bytes received: %s\n", syscall(__NR_gettid), tb,
+                       total, contentbuf);
+                // now we have a request struct we can switch for what we need
+                int flag = 0;
+                extract_buffer(&e_ptr, &char_count, req, args->host_addr, args->conn_clients,
+                               args->conn_clients_lock, &flag, args->arrlen);
+
+                // by here need flag, req
                 switch(flag) {
                     case FREQ: { // 1: other machine requesting file content
                         printf("File request received\n");
                         int fd = -1, res = 0, offset = 0, size = 0;
-                        char hostip[32];
-                        snprintf(hostip, 32, "%s", inet_ntoa(args->host_addr.addr.sin_addr));
-                        char hostpo[16];
-                        snprintf(hostpo, 16, "%d", htons(args->host_addr.addr.sin_port));
                         fd = openat(AT_FDCWD, req->path, O_RDONLY);
                         if (fd == -1) {
                             perror("openat");
                             exit (EXIT_FAILURE);
                         }
                         size = procsizefd(fd);
-                        char *procbuf = calloc(0, size + 1);
+                        char *procbuf = malloc(sizeof(char) * size);
                         printf("procsize: %d\n", size);
 
                         res = pread(fd, procbuf, size, offset);
@@ -545,7 +559,7 @@ void *server_loop(void *arg) {
                         snprintf(req->buf, req->buflen, "%s", procbuf);
 
                         // send the req back to the sender
-                        char *message = create_message(hostip, hostpo, req, HEADER, FCNT);
+                        char *message = create_message(args->host_addr, req, HEADER, FCNT);
                         printf("FCNT Sending: %s\n", message);
 
                         int err = 0;
@@ -562,12 +576,10 @@ void *server_loop(void *arg) {
                         }
                         free(message);
                         free(procbuf);
-                        free(buf);
-                        free(final_buf);
                         break;
                     }
                     case FCNT: // 2: this machine receiving a response with content
-                    printf("File content received\n");
+                        printf("File content received\n");
                         req->buflen = char_count + 1; // char count includes 0 index so must add 1
                         req = realloc(req, sizeof(Request) + req->buflen);
                         memset(req->buf, 0, req->buflen);
@@ -606,6 +618,7 @@ void *server_loop(void *arg) {
                         break;
                 }
                 free(req);
+                free(buf);
 
 //                exit(EXIT_SUCCESS);
 
@@ -615,19 +628,6 @@ void *server_loop(void *arg) {
         } // END of poll loop
     } // END of inf for loop
 } // END of server loop
-
-//printf("Req looks like this:\nSender IP: %s\n"
-//"Sender Port: %d\nsock_in: %d & sock_out: %d\n"
-//"Atomic counter = %llu\nPath: %s\nBuflen: %lu\n"
-//"Buf:\n%s\n",
-//inet_ntoa(req->sender.addr.sin_addr),
-//htons(req->sender.addr.sin_port),
-//req->sender.sock_in, req->sender.sock_out,
-//req->atomic_counter,
-//req->path,
-//req->buflen,
-//req->buf
-//);
 
 int main(int argc, char *argv[]) {
 
@@ -701,6 +701,13 @@ int main(int argc, char *argv[]) {
     pthread_mutex_t a_counter_lock = PTHREAD_MUTEX_INITIALIZER;
     char buf[1024];
     Address ad;
+//    int headersize = (strlen(inet_ntoa(host_addr.addr.sin_addr)) +
+//            sizeof(htons(host_addr.addr.sin_port)) +
+//            strlen(inet_ntoa(ad.addr.sin_addr)) +
+//            sizeof(htons(ad.addr.sin_port)) +
+//            sizeof(a_counter) +
+//            MAXPATH
+//            );
 
     /*
      * TODO
@@ -710,10 +717,6 @@ int main(int argc, char *argv[]) {
          * fill in details of Request
      */
 
-    char hostip[32];
-    snprintf(hostip, 32, "%s", inet_ntoa(host_addr.addr.sin_addr));
-    char hostpo[16];
-    snprintf(hostpo, 16, "%d", htons(host_addr.addr.sin_port));
     for(;;) {
         printf("~ ");
         scanf("%s", buf);
@@ -736,7 +739,7 @@ int main(int argc, char *argv[]) {
             req_tracker_ll_print(&inprog->req_ll_head);
             pthread_mutex_unlock(&inprog_lock);
 
-            char *message = create_message(hostip, hostpo, req, HEADER, FREQ);
+            char *message = create_message(host_addr, req, HEADER, FREQ);
             printf("FREQ Sending: %s\n", message);
 
             if((err = send(req->sender.sock_out, message, strlen(message), 0)) <= 0) {
@@ -762,7 +765,7 @@ int main(int argc, char *argv[]) {
 //    memset(inprog, 0, sizeof(Inprog));
 //    req_tracker_ll_add(&inprog->req_ll_head, req);
 //    req_tracker_ll_print(&inprog->req_ll_head);
-//    char *tmp = "This is the new buffer content!";
+//    char *contentbuf = "This is the new buffer content!";
 //    if(req_add_content(&inprog->req_ll_head, *req, tmp, strlen(tmp) + 1) < 0) {
 //        printf("Unable to find Request\n");
 //    }
