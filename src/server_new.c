@@ -358,6 +358,7 @@ int procsizefd(int fd) {
 }
 
 char *create_message(Address host_addr, Request *req, int headerlen, int flag) {
+
     char hostip[32];
     snprintf(hostip, 32, "%s", inet_ntoa(host_addr.addr.sin_addr));
     char hostpo[16];
@@ -397,6 +398,7 @@ char *create_message(Address host_addr, Request *req, int headerlen, int flag) {
 }
 
 int fetch_upto_delim(char **bufptr, char *buf, int *char_count) {
+
     while(*(*bufptr) != '-') {
         strncat(buf, *bufptr, 1);
         *(*bufptr)++;
@@ -407,6 +409,7 @@ int fetch_upto_delim(char **bufptr, char *buf, int *char_count) {
 }
 
 int fetch_size(char *buf, int *counter) {
+
     char size[sizeof(size_t)] = {0};
     while(buf[*counter] != '-') {
         strncat(size, &buf[*counter], 1);
@@ -419,6 +422,7 @@ int fetch_size(char *buf, int *counter) {
 }
 
 int extract_header(char **bufptr, int *char_count, Request *req, Address host_addr) {
+
     char senderIP[32] = {0};
     char senderPort[16] = {0};
     char hostIP[32] = {0};
@@ -667,22 +671,6 @@ int main(int argc, char *argv[]) {
     pthread_mutex_t a_counter_lock = PTHREAD_MUTEX_INITIALIZER;
     char buf[1024];
     Address ad;
-//    int headersize = (strlen(inet_ntoa(host_addr.addr.sin_addr)) +
-//            sizeof(htons(host_addr.addr.sin_port)) +
-//            strlen(inet_ntoa(ad.addr.sin_addr)) +
-//            sizeof(htons(ad.addr.sin_port)) +
-//            sizeof(a_counter) +
-//            MAXPATH
-//            );
-
-    /*
-     * TODO
-         * malloc a Request and request_tracker_node
-         * fill in Request, point rtn to it
-         * point inprog.req_ll_head to this (head)
-         * fill in details of Request
-     */
-
     for(;;) {
         printf("~ ");
         scanf("%s", buf);
@@ -722,20 +710,5 @@ int main(int argc, char *argv[]) {
             free(message);
         } // END of write for loop
     } // END of inf for loop
-
-
-// ----- usage of new ds' ------
-//    Request *req = (Request *)malloc(sizeof(Request));
-//    memset(req, 0, sizeof(Request));
-//    Inprog *inprog = (Inprog *)malloc(sizeof(Inprog));
-//    memset(inprog, 0, sizeof(Inprog));
-//    req_tracker_ll_add(&inprog->req_ll_head, req);
-//    req_tracker_ll_print(&inprog->req_ll_head);
-//    char *contentbuf = "This is the new buffer content!";
-//    if(req_add_content(&inprog->req_ll_head, *req, tmp, strlen(tmp) + 1) < 0) {
-//        printf("Unable to find Request\n");
-//    }
-//    inprog_reset(inprog);
-
     return 0;
 }
