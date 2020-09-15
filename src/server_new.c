@@ -500,11 +500,8 @@ void *server_loop(void *arg) {
                          * 2: content received
                              * (extra) make into void method
                      * Going to need the inprog_tracker_node ll as global so fuse can access
-                     * cannot calloc/malloc tmp unless it is over 4000.. no idea why
                  */
-                char contentbuf[4000] = {0};
-                char *e_ptr = contentbuf;
-                int counter = 0, readbytes = 0, flag = 0;
+                int counter = 0, flag = 0;
                 Request *req = (Request *)malloc(sizeof(Request));
                 memset(req, 0, sizeof(Request));
                 char *buf = calloc(0, sizeof(size_t) + 1);
@@ -517,9 +514,11 @@ void *server_loop(void *arg) {
                 }
                 int total = fetch_size(buf, &counter);
                 int char_count = total;
-                buf = realloc(buf, total + 1);
+                buf = realloc(buf, sizeof(char) * total + 1);
                 // save after '-' into tmp
-                strncpy(contentbuf, &buf[counter], read_bytes - counter);
+                char *contentbuf = malloc(sizeof(char) * total + 1);
+                char *e_ptr = contentbuf;
+                strncpy(contentbuf, &buf[counter], read_bytes - counter + 1);
                 int rem_bytes = total - read_bytes + counter; // already read 8 bytes, but size not included in total
                 while(rem_bytes > 0) {
                     // could have new var from recv and use that in an strncat
@@ -590,6 +589,7 @@ void *server_loop(void *arg) {
                 }
                 free(req);
                 free(buf);
+                free(contentbuf);
             }
         } // END of poll loop
     } // END of inf for loop
