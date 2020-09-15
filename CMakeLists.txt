@@ -14,7 +14,8 @@ set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/CMakeModules/")
 #        src/queue.c src/defs.h)
 
 add_executable(server_new
-        src/server_new.c src/server_new.h)
+        src/server_new.c src/server_new.h
+        src/ds_new.c src/ds_new.h)
 add_executable(procsys
         src/main.c src/fileops.c
         src/fileops.h src/client.c
@@ -87,7 +88,9 @@ endif()
 target_link_libraries(${PROJECT_NAME}
         ${LIBFUSE_LIBRARIES}
         pthread
+        m
         )
 target_link_libraries(server_new
         pthread
+        m
         )
