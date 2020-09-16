@@ -17,14 +17,10 @@ add_executable(server_new
         src/server_new.c src/server_new.h
         src/ds_new.c src/ds_new.h)
 add_executable(procsys
-        src/main.c src/fileops.c
-        src/fileops.h src/client.c
-        src/client.h src/log.c
-        src/log.h src/writer.c
-        src/writer.h src/reader.c
-        src/reader.h src/queue.h
-        src/queue.c src/defs.h
-        src/server.c src/server.h)
+        src/main.c
+        src/log.h src/log.c
+        src/server_new.c src/server_new.h
+        src/ds_new.h src/ds_new.c)
 add_executable(procsys2
         src/main.c src/fileops.c
         src/fileops.h src/client.c

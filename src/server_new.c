@@ -599,116 +599,116 @@ void *server_loop(void *arg) {
     } // END of inf for loop
 } // END of server loop
 
-int main(int argc, char *argv[]) {
-
-    if(argc < 4) {
-        printf("Not enough arguments given, 4 expected: total-machines port-number interface-name ipfile\n");
-        exit(EXIT_FAILURE);
-    }
-    long nrm = strtol(argv[1], NULL, 10);
-    long pnr = strtol(argv[2], NULL, 10);
-    const char *infc = argv[3];
-    const char *fn = argv[4];
-    // Check if returned error from strtol OR if the longs are too large to convert
-    if (errno != 0 || ((nrm > INT_MAX) || (pnr > INT_MAX ))) {
-        printf("%s argument too large!\n", (nrm > INT_MAX) ? "first" : "second");
-        exit(EXIT_FAILURE);
-    }
-    int err;
-    int nrmachines = (int)nrm - 1; // to account for this machine (not adding to connected clients)
-    int portnr = (int)pnr;
-
-    printf("Connecting to other machines..\n");
-    Address host_addr;
-    memset(&host_addr, 0, sizeof(host_addr));
-    init_server(&host_addr, nrmachines, portnr, infc);
-
-    // init Address arrays and their corresponding mutex locks
-    Address connected_clients[nrmachines];
-    memset(connected_clients, 0, sizeof(Address) * (nrmachines));
-    pthread_mutex_t connected_clients_lock = PTHREAD_MUTEX_INITIALIZER;;
-
-    Inprog *inprog = (Inprog *)malloc(sizeof(Inprog));
-    if(inprog == NULL) {
-        perror("malloc");
-        exit(EXIT_FAILURE);
-    }
-    memset(inprog, 0, sizeof(Inprog));
-    pthread_mutex_t inprog_lock = PTHREAD_MUTEX_INITIALIZER;
-
-    // accept all incoming connections until have sock_in for all machines in list
-    struct accept_connection_args aca = {connected_clients, &connected_clients_lock,
-                                         host_addr, nrmachines, fn};
-    pthread_t aca_thread;
-    pthread_create(&aca_thread, NULL, accept_connection, &aca);
-    // connect to IPs in ipfile
-    struct connect_to_file_IPs_args ctipa = {connected_clients, &connected_clients_lock,
-                                             host_addr, nrmachines, fn};
-    pthread_t ctipa_thread;
-    pthread_create(&ctipa_thread, NULL, connect_to_file_IPs, &ctipa);
-    // force main to wait until connected to all machines
-    pthread_join(ctipa_thread, NULL);
-    pthread_join(aca_thread, NULL);
-
-    printf("You are now connected to machines: \n");
-    for(int j = 0; j < nrmachines; j++) {
-        printf("%s\t@\t%d\n",
-               inet_ntoa(connected_clients[j].addr.sin_addr),
-               htons(connected_clients[j].addr.sin_port));
-    }
-    printf("on this address: \n%s\t@\t%d\n",
-           inet_ntoa(host_addr.addr.sin_addr),
-           htons(host_addr.addr.sin_port));
-
-    // start server loop to listen for connections
-    struct server_loop_args sla = {connected_clients, &connected_clients_lock,
-                                   inprog, &inprog_lock,
-                                   host_addr, nrmachines, fn};
-    pthread_t sla_thread;
-    pthread_create(&sla_thread, NULL, server_loop, &sla);
-
-    long long a_counter = 0;
-    pthread_mutex_t a_counter_lock = PTHREAD_MUTEX_INITIALIZER;
-    char buf[1024];
-    Address ad;
-    for(;;) {
-        printf("~ ");
-        scanf("%s", buf);
-        pthread_mutex_lock(&a_counter_lock);
-        a_counter++; // only increment this on new request NOT each machine
-        for(int i = 0; i < nrmachines; i++) {
-            // create request
-            Request *req = (Request *)malloc(sizeof(Request));
-            memset(req, 0, sizeof(Request));
-            // fill in request struct with info
-            req->sender = connected_clients[i];
-            req->atomic_counter = inprog->atomic_counter = a_counter;
-            pthread_mutex_unlock(&a_counter_lock);
-            snprintf(req->path, MAXPATH, "/proc/net/dev");
-            // Add to inprog
-            pthread_mutex_lock(&inprog_lock);
-            req_tracker_ll_add(&inprog->req_ll_head, req);
-            inprog->messages_sent++;
-            inprog->complete = false;
-            req_tracker_ll_print(&inprog->req_ll_head);
-            pthread_mutex_unlock(&inprog_lock);
-
-            char *message = create_message(host_addr, req, HEADER, FREQ);
-            printf("FREQ Sending: %s\n", message);
-
-            if((err = send(req->sender.sock_out, message, strlen(message), 0)) <= 0) {
-                if(err < 0) {
-                    perror("send");
-                }
-                get_time(tb);
-                printf("[thread: %ld {%s}] write to host_client failed\n", syscall(__NR_gettid), tb);
-            } else {
-                get_time(tb);
-                printf("[thread: %ld {%s}] sent %d bytes to %s @ sock_out: %d\n", syscall(__NR_gettid),
-                       tb, err, inet_ntoa(req->sender.addr.sin_addr), req->sender.sock_out);
-            }
-            free(message);
-        } // END of write for loop
-    } // END of inf for loop
-    return 0;
-}
+//int main(int argc, char *argv[]) {
+//
+//    if(argc < 4) {
+//        printf("Not enough arguments given, 4 expected: total-machines port-number interface-name ipfile\n");
+//        exit(EXIT_FAILURE);
+//    }
+//    long nrm = strtol(argv[1], NULL, 10);
+//    long pnr = strtol(argv[2], NULL, 10);
+//    const char *infc = argv[3];
+//    const char *fn = argv[4];
+//    // Check if returned error from strtol OR if the longs are too large to convert
+//    if (errno != 0 || ((nrm > INT_MAX) || (pnr > INT_MAX ))) {
+//        printf("%s argument too large!\n", (nrm > INT_MAX) ? "first" : "second");
+//        exit(EXIT_FAILURE);
+//    }
+//    int err;
+//    int nrmachines = (int)nrm - 1; // to account for this machine (not adding to connected clients)
+//    int portnr = (int)pnr;
+//
+//    printf("Connecting to other machines..\n");
+//    Address host_addr;
+//    memset(&host_addr, 0, sizeof(host_addr));
+//    init_server(&host_addr, nrmachines, portnr, infc);
+//
+//    // init Address arrays and their corresponding mutex locks
+//    Address connected_clients[nrmachines];
+//    memset(connected_clients, 0, sizeof(Address) * (nrmachines));
+//    pthread_mutex_t connected_clients_lock = PTHREAD_MUTEX_INITIALIZER;;
+//
+//    Inprog *inprog = (Inprog *)malloc(sizeof(Inprog));
+//    if(inprog == NULL) {
+//        perror("malloc");
+//        exit(EXIT_FAILURE);
+//    }
+//    memset(inprog, 0, sizeof(Inprog));
+//    pthread_mutex_t inprog_lock = PTHREAD_MUTEX_INITIALIZER;
+//
+//    // accept all incoming connections until have sock_in for all machines in list
+//    struct accept_connection_args aca = {connected_clients, &connected_clients_lock,
+//                                         host_addr, nrmachines, fn};
+//    pthread_t aca_thread;
+//    pthread_create(&aca_thread, NULL, accept_connection, &aca);
+//    // connect to IPs in ipfile
+//    struct connect_to_file_IPs_args ctipa = {connected_clients, &connected_clients_lock,
+//                                             host_addr, nrmachines, fn};
+//    pthread_t ctipa_thread;
+//    pthread_create(&ctipa_thread, NULL, connect_to_file_IPs, &ctipa);
+//    // force main to wait until connected to all machines
+//    pthread_join(ctipa_thread, NULL);
+//    pthread_join(aca_thread, NULL);
+//
+//    printf("You are now connected to machines: \n");
+//    for(int j = 0; j < nrmachines; j++) {
+//        printf("%s\t@\t%d\n",
+//               inet_ntoa(connected_clients[j].addr.sin_addr),
+//               htons(connected_clients[j].addr.sin_port));
+//    }
+//    printf("on this address: \n%s\t@\t%d\n",
+//           inet_ntoa(host_addr.addr.sin_addr),
+//           htons(host_addr.addr.sin_port));
+//
+//    // start server loop to listen for connections
+//    struct server_loop_args sla = {connected_clients, &connected_clients_lock,
+//                                   inprog, &inprog_lock,
+//                                   host_addr, nrmachines, fn};
+//    pthread_t sla_thread;
+//    pthread_create(&sla_thread, NULL, server_loop, &sla);
+//
+//    long long a_counter = 0;
+//    pthread_mutex_t a_counter_lock = PTHREAD_MUTEX_INITIALIZER;
+//    char buf[1024];
+//    Address ad;
+//    for(;;) {
+//        printf("~ ");
+//        scanf("%s", buf);
+//        pthread_mutex_lock(&a_counter_lock);
+//        a_counter++; // only increment this on new request NOT each machine
+//        for(int i = 0; i < nrmachines; i++) {
+//            // create request
+//            Request *req = (Request *)malloc(sizeof(Request));
+//            memset(req, 0, sizeof(Request));
+//            // fill in request struct with info
+//            req->sender = connected_clients[i];
+//            req->atomic_counter = inprog->atomic_counter = a_counter;
+//            pthread_mutex_unlock(&a_counter_lock);
+//            snprintf(req->path, MAXPATH, "/proc/net/dev");
+//            // Add to inprog
+//            pthread_mutex_lock(&inprog_lock);
+//            req_tracker_ll_add(&inprog->req_ll_head, req);
+//            inprog->messages_sent++;
+//            inprog->complete = false;
+//            req_tracker_ll_print(&inprog->req_ll_head);
+//            pthread_mutex_unlock(&inprog_lock);
+//
+//            char *message = create_message(host_addr, req, HEADER, FREQ);
+//            printf("FREQ Sending: %s\n", message);
+//
+//            if((err = send(req->sender.sock_out, message, strlen(message), 0)) <= 0) {
+//                if(err < 0) {
+//                    perror("send");
+//                }
+//                get_time(tb);
+//                printf("[thread: %ld {%s}] write to host_client failed\n", syscall(__NR_gettid), tb);
+//            } else {
+//                get_time(tb);
+//                printf("[thread: %ld {%s}] sent %d bytes to %s @ sock_out: %d\n", syscall(__NR_gettid),
+//                       tb, err, inet_ntoa(req->sender.addr.sin_addr), req->sender.sock_out);
+//            }
+//            free(message);
+//        } // END of write for loop
+//    } // END of inf for loop
+//    return 0;
+//}
