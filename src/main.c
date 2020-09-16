@@ -42,23 +42,14 @@
 #include "ds_new.h"
 #include "server_new.h"
 
-int client_socket;
-int pipecomms[2];
 int nrmachines;
+long long a_counter;
+pthread_mutex_t a_counter_lock = PTHREAD_MUTEX_INITIALIZER;
 Address host_addr;
 Address *connected_clients;
-
-/*
- * TODO
- *  * main
- *  - [ ] error checking to see if read op actually read all of the file
- *  - [x] prepend the path to the file content
- *  - [x] remove the process number
- *  * bugs
- *  - [x] if typed 'cat <filename>' and then delete a char, main segfaults (seems to be only net/dev)
- *      * was the malloc in read()
- *      * Can we somehow skip the reading of the file and get res somewhere else?
- */
+pthread_mutex_t connected_clients_lock = PTHREAD_MUTEX_INITIALIZER;;
+Inprog_tracker_node *inprog_tracker_head;
+pthread_mutex_t inprog_tracker_lock = PTHREAD_MUTEX_INITIALIZER;;
 
 static void *procsys_init(struct fuse_conn_info *conn,
                       struct fuse_config *cfg) {
@@ -302,7 +293,6 @@ int main(int argc, char *argv[]) {
 
     connected_clients = (Address *)malloc(sizeof(Address) * nrmachines);
     memset(connected_clients, 0, sizeof(Address) * nrmachines);
-    pthread_mutex_t connected_clients_lock = PTHREAD_MUTEX_INITIALIZER;;
 
     Inprog *inprog = (Inprog *)malloc(sizeof(Inprog));
     if(inprog == NULL) {
@@ -343,9 +333,5 @@ int main(int argc, char *argv[]) {
     pthread_t sla_thread;
     pthread_create(&sla_thread, NULL, server_loop, &sla);
 
-    long long a_counter = 0;
-    pthread_mutex_t a_counter_lock = PTHREAD_MUTEX_INITIALIZER;
-
-    exit(EXIT_FAILURE);
     return fuse_main(argc, argv, &procsys_ops, NULL);
 }

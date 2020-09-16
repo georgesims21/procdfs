@@ -112,6 +112,7 @@ static int pconnect(Address *addrarr, int arrlen, Address *newaddr);
 static int contained_within(Address *addr, Address lookup, int arrlen);
 static void paccept(Address host_addr, Address *client_addr);
 static int search_IPs(in_addr_t conn, const char *filename);
+char *create_message(Address host_addr, Request *req, int headerlen, int flag);
 
 /*
  * struct create_request_args {
