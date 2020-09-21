@@ -20,10 +20,14 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <dirent.h>
 #include <errno.h>
 #include <pthread.h>
 #include <limits.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
 #ifdef __FreeBSD__
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -51,6 +55,8 @@ pthread_mutex_t connected_clients_lock = PTHREAD_MUTEX_INITIALIZER;;
 Inprog_tracker_node *inprog_tracker_head;
 pthread_mutex_t inprog_tracker_lock = PTHREAD_MUTEX_INITIALIZER;;
 
+char *pnd = "/proc/net/dev";
+
 static void *procsys_init(struct fuse_conn_info *conn,
                       struct fuse_config *cfg) {
 
@@ -68,12 +74,51 @@ static void *procsys_init(struct fuse_conn_info *conn,
     cfg->attr_timeout = 0;
     cfg->negative_timeout = 0;
 
-
     return NULL;
 }
 
 static int procsys_getattr(const char *path, struct stat *stbuf,
                        struct fuse_file_info *fi) {
+
+    stbuf->st_gid = getgid();
+    stbuf->st_uid = getuid();
+    if(strcmp(path, "/") == 0) {
+        // root
+        stbuf->st_mode = S_IFDIR | 0444; // gives all read access no more
+        stbuf->st_nlink = 2; // (2+n dirs) account for . and .. https://unix.stackexchange.com/questions/101515/why-does-a-new-directory-have-a-hard-link-count-of-2-before-anything-is-added-to/101536#101536
+    } else if(strcmp(path, "/net/dev") == 0){
+        // files
+        stbuf->st_mode = S_IFREG | 0444;
+        stbuf->st_nlink = 1; // only located here, nowhere else yet
+        stbuf->st_atim.tv_sec = time(NULL);
+        // need to fetch the size of file
+        Inprog *inprog = (Inprog *)malloc(sizeof(Inprog));
+        memset(inprog, 0, sizeof(Inprog));
+        inprog->complete = false;
+        pthread_mutex_lock(&a_counter_lock);
+        a_counter++;
+        inprog->atomic_counter = a_counter;
+        for(int i = 0; i < nrmachines; i++) {
+            // create request
+            Request *req = (Request *)malloc(sizeof(Request));
+            memset(req, 0, sizeof(Request));
+            // fill in request struct with info
+            req->sender = connected_clients[i];
+            req->atomic_counter = a_counter;
+            pthread_mutex_unlock(&a_counter_lock);
+            snprintf(req->path, MAXPATH, pnd);
+            // Add to inprog
+            pthread_mutex_lock(&inprog_tracker_lock);
+            req_tracker_ll_add(&inprog->req_ll_head, req);
+            inprog->messages_sent++;
+            req_tracker_ll_print(&inprog->req_ll_head);
+            pthread_mutex_unlock(&inprog_tracker_lock);
+        }
+        pthread_mutex_lock(&inprog_tracker_lock);
+        inprog_ll_addnode(&inprog_tracker_head, inprog);
+        pthread_mutex_unlock(&inprog_tracker_lock);
+//        stbuf->st_size
+    }
 
 //    (void) fi;
 //    int res;
@@ -104,7 +149,7 @@ static int procsys_access(const char *path, int mask) {
 //    res = access(fpath, mask);
 //    if (res == -1)
 //        return -errno;
-//
+
     return 0;
 }
 
@@ -125,7 +170,15 @@ static int procsys_readlink(const char *path, char *buf, size_t size) {
 static int procsys_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                        off_t offset, struct fuse_file_info *fi,
                        enum fuse_readdir_flags flags) {
+    (void)fi;
 
+    filler(buf, ".", NULL, 0, 0); // Current Directory
+    filler(buf, "..", NULL, 0, 0); // Parent Directory
+
+    if ( strcmp( path, "/" ) == 0 ) // If the user is trying to show the files/directories of the root directory show the following
+    {
+        filler(buf, "net/dev", NULL, 0, 0);
+    }
 //    DIR *dp;
 //    struct dirent *de;
 //    char fpath[MAX_PATH] = {0};
@@ -290,17 +343,8 @@ int main(int argc, char *argv[]) {
     init_server(&host_addr, nrmachines, portnr, infc);
 
     // init Address arrays and their corresponding mutex locks
-
     connected_clients = (Address *)malloc(sizeof(Address) * nrmachines);
     memset(connected_clients, 0, sizeof(Address) * nrmachines);
-
-    Inprog *inprog = (Inprog *)malloc(sizeof(Inprog));
-    if(inprog == NULL) {
-        perror("malloc");
-        exit(EXIT_FAILURE);
-    }
-    memset(inprog, 0, sizeof(Inprog));
-    pthread_mutex_t inprog_lock = PTHREAD_MUTEX_INITIALIZER;
 
     // accept all incoming connections until have sock_in for all machines in list
     struct accept_connection_args aca = {connected_clients, &connected_clients_lock,
@@ -327,9 +371,9 @@ int main(int argc, char *argv[]) {
            htons(host_addr.addr.sin_port));
 
     // start server loop to listen for connections
-    struct server_loop_args sla = {connected_clients, &connected_clients_lock,
-                                   inprog, &inprog_lock,
-                                   host_addr, nrmachines, fn};
+    struct server_loop_args sla = {connected_clients, &connected_clients_lock, host_addr,
+                                   inprog_tracker_head, &inprog_tracker_lock,
+                                    nrmachines, fn};
     pthread_t sla_thread;
     pthread_create(&sla_thread, NULL, server_loop, &sla);
 
