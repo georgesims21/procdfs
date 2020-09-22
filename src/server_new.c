@@ -762,22 +762,7 @@ int main(int argc, char *argv[]) {
             // Add to inprog
             add_inprog(inprog, req);
             req_tracker_ll_print(&inprog->req_ll_head);
-
-            char *message = create_message(host_addr, req, HEADER, FREQ);
-            printf("FREQ Sending: %s\n", message);
-
-            if((err = send(req->sender.sock_out, message, strlen(message), 0)) <= 0) {
-                if(err < 0) {
-                    perror("send");
-                }
-                get_time(tb);
-                printf("[thread: %ld {%s}] write to host_client failed\n", syscall(__NR_gettid), tb);
-            } else {
-                get_time(tb);
-                printf("[thread: %ld {%s}] sent %d bytes to %s @ sock_out: %d\n", syscall(__NR_gettid),
-                       tb, err, inet_ntoa(req->sender.addr.sin_addr), req->sender.sock_out);
-            }
-            free(message);
+            create_send_msg(req);
         } // END of write for loop
         inprog_tracker_ll_add(&inprog_tracker_head, inprog, inprog_lock);
         pthread_mutex_unlock(&inprog_tracker_lock);
