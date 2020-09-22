@@ -485,6 +485,61 @@ int extract_buffer(char **bufptr, int *char_count, Request *req, Address host_ad
     return 0;
 }
 
+Request *req_create(Address sender, long long counter, char *path) {
+
+    Request *req = (Request *)malloc(sizeof(Request));
+    memset(req, 0, sizeof(Request));
+    // fill in request struct with info
+    req->sender = sender;
+    req->atomic_counter = counter;
+    snprintf(req->path, MAXPATH, "%s", path);
+    return req;
+}
+
+int inprog_create(void) {
+
+    int err = 0;
+    Inprog *inprog = (Inprog *)malloc(sizeof(Inprog));
+    memset(inprog, 0, sizeof(Inprog));
+    pthread_mutex_t *inprog_lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+    pthread_mutex_init(inprog_lock, NULL);
+    inprog->complete = false;
+    pthread_mutex_lock(&inprog_tracker_lock);
+    pthread_mutex_lock(&a_counter_lock);
+    a_counter++; // only increment this on new request NOT each machine
+    inprog->atomic_counter = a_counter;
+    pthread_mutex_unlock(&a_counter_lock);
+    for(int i = 0; i < nrmachines; i++) {
+        // create request
+        Request *req = req_create(connected_clients[i], inprog->atomic_counter, "/proc/net/dev");
+
+        // Add to inprog
+        req_tracker_ll_add(&inprog->req_ll_head, req);
+        inprog->messages_sent++;
+        inprog->complete = false;
+        req_tracker_ll_print(&inprog->req_ll_head);
+
+        char *message = create_message(host_addr, req, HEADER, FREQ);
+        printf("FREQ Sending: %s\n", message);
+
+        if((err = send(req->sender.sock_out, message, strlen(message), 0)) <= 0) {
+            if(err < 0) {
+                perror("send");
+            }
+            get_time(tb);
+            printf("[thread: %ld {%s}] write to host_client failed\n", syscall(__NR_gettid), tb);
+        } else {
+            get_time(tb);
+            printf("[thread: %ld {%s}] sent %d bytes to %s @ sock_out: %d\n", syscall(__NR_gettid),
+                   tb, err, inet_ntoa(req->sender.addr.sin_addr), req->sender.sock_out);
+        }
+        free(message);
+    } // END of write for loop
+    inprog_tracker_ll_add(&inprog_tracker_head, inprog, inprog_lock);
+
+    return 0;
+}
+
 void *server_loop(void *arg) {
 
     struct server_loop_args *args = (struct server_loop_args *)arg;
@@ -692,12 +747,7 @@ int main(int argc, char *argv[]) {
         pthread_mutex_unlock(&a_counter_lock);
         for(int i = 0; i < nrmachines; i++) {
             // create request
-            Request *req = (Request *)malloc(sizeof(Request));
-            memset(req, 0, sizeof(Request));
-            // fill in request struct with info
-            req->sender = connected_clients[i];
-            req->atomic_counter = inprog->atomic_counter;
-            snprintf(req->path, MAXPATH, "/proc/net/dev");
+            Request *req = req_create(connected_clients[i], inprog->atomic_counter, "/proc/net/dev");
             // Add to inprog
             req_tracker_ll_add(&inprog->req_ll_head, req);
             inprog->messages_sent++;
