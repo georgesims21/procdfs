@@ -36,7 +36,8 @@ typedef struct inprog {
 }Inprog;
 
 typedef struct inprog_tracker_node {
-    Inprog *inprg;
+    Inprog *inprog;
+    pthread_mutex_t *inprog_lock;
     struct inprog_tracker_node *next;
 }Inprog_tracker_node;
 
@@ -53,5 +54,9 @@ int request_ll_free(Request_tracker_node **head);
 void inprog_reset(Inprog *inp);
 int request_ll_complete(Request_tracker_node **head);
 int inprog_add_buf(Request *req, Inprog *inprog, pthread_mutex_t *inprog_lock);
+int inprog_tracker_ll_add(Inprog_tracker_node **head, Inprog *inprog, pthread_mutex_t *inprog_lock);
+void inprog_tracker_ll_print(Inprog_tracker_node **head);
+Inprog_tracker_node *inprog_tracker_ll_fetch(Inprog_tracker_node **head, Request req);
+int inprog_tracker_ll_remove(Inprog_tracker_node **head, Inprog inprog);
 
 #endif //PROCSYS_DS_NEW_H

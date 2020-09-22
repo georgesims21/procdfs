@@ -48,7 +48,6 @@ void *accept_connection(void *arg);
 
 struct server_loop_args {
     Address *conn_clients; pthread_mutex_t *conn_clients_lock;
-    Inprog *inprog; pthread_mutex_t *inprog_lock;
     Address host_addr;
     int arrlen;
     const char *filename;
