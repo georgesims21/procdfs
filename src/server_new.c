@@ -526,29 +526,24 @@ int create_send_msg(Request *req) {
     return 0;
 }
 
-int inprog_create(void) {
+Inprog *inprog_create(char *path) {
 
     int err = 0;
     Inprog *inprog = (Inprog *)malloc(sizeof(Inprog));
     memset(inprog, 0, sizeof(Inprog));
-    pthread_mutex_t *inprog_lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
-    pthread_mutex_init(inprog_lock, NULL);
     inprog->complete = false;
-    pthread_mutex_lock(&inprog_tracker_lock);
     pthread_mutex_lock(&a_counter_lock);
-    a_counter++; // only increment this on new request NOT each machine
+    a_counter++; // only increment this on new request NOT each machine (reserve 0)
     inprog->atomic_counter = a_counter;
     pthread_mutex_unlock(&a_counter_lock);
     for(int i = 0; i < nrmachines; i++) {
         // create request
-        Request *req = req_create(connected_clients[i], inprog->atomic_counter, "/proc/net/dev");
+        Request *req = req_create(connected_clients[i], inprog->atomic_counter, path);
         add_inprog(inprog, req);
         req_tracker_ll_print(&inprog->req_ll_head);
         create_send_msg(req);
     } // END of write for loop
-    inprog_tracker_ll_add(&inprog_tracker_head, inprog, inprog_lock);
-
-    return 0;
+    return inprog;
 }
 
 void *server_loop(void *arg) {
@@ -745,29 +740,18 @@ int main(int argc, char *argv[]) {
     for(;;) {
         printf("~ ");
         scanf("%s", buf);
-        // create Inprog
-        Inprog *inprog = (Inprog *)malloc(sizeof(Inprog));
-        memset(inprog, 0, sizeof(Inprog));
+        pthread_mutex_lock(&inprog_tracker_lock);
+        // create Inprog and lock
+        Inprog *inprog = inprog_create("/proc/net/dev");
         pthread_mutex_t *inprog_lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
         pthread_mutex_init(inprog_lock, NULL);
-        inprog->complete = false;
-        pthread_mutex_lock(&inprog_tracker_lock);
-        pthread_mutex_lock(&a_counter_lock);
-        a_counter++; // only increment this on new request NOT each machine
-        inprog->atomic_counter = a_counter;
-        pthread_mutex_unlock(&a_counter_lock);
-        for(int i = 0; i < nrmachines; i++) {
-            // create request
-            Request *req = req_create(connected_clients[i], inprog->atomic_counter, "/proc/net/dev");
-            // Add to inprog
-            add_inprog(inprog, req);
-            req_tracker_ll_print(&inprog->req_ll_head);
-            create_send_msg(req);
-        } // END of write for loop
+        // create node in linked list
         inprog_tracker_ll_add(&inprog_tracker_head, inprog, inprog_lock);
         pthread_mutex_unlock(&inprog_tracker_lock);
+        // wait until complete
         while(!inprog->complete) {sleep(1);};
         pthread_mutex_lock(&inprog_tracker_lock);
+        // delete inprog from list
         inprog_tracker_ll_remove(&inprog_tracker_head, *inprog);
         pthread_mutex_unlock(&inprog_tracker_lock);
     } // END of inf for loop
