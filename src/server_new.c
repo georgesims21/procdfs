@@ -496,6 +496,36 @@ Request *req_create(Address sender, long long counter, char *path) {
     return req;
 }
 
+int add_inprog(Inprog *inprog, Request *req) {
+
+    // Add to inprog
+    req_tracker_ll_add(&inprog->req_ll_head, req);
+    inprog->messages_sent++;
+    inprog->complete = false;
+    return 0;
+}
+
+int create_send_msg(Request *req) {
+
+    int err = 0;
+    char *message = create_message(host_addr, req, HEADER, FREQ);
+    printf("FREQ Sending: %s\n", message);
+
+    if((err = send(req->sender.sock_out, message, strlen(message), 0)) <= 0) {
+        if(err < 0) {
+            perror("send");
+        }
+        get_time(tb);
+        printf("[thread: %ld {%s}] write to host_client failed\n", syscall(__NR_gettid), tb);
+    } else {
+        get_time(tb);
+        printf("[thread: %ld {%s}] sent %d bytes to %s @ sock_out: %d\n", syscall(__NR_gettid),
+               tb, err, inet_ntoa(req->sender.addr.sin_addr), req->sender.sock_out);
+    }
+    free(message);
+    return 0;
+}
+
 int inprog_create(void) {
 
     int err = 0;
@@ -512,28 +542,9 @@ int inprog_create(void) {
     for(int i = 0; i < nrmachines; i++) {
         // create request
         Request *req = req_create(connected_clients[i], inprog->atomic_counter, "/proc/net/dev");
-
-        // Add to inprog
-        req_tracker_ll_add(&inprog->req_ll_head, req);
-        inprog->messages_sent++;
-        inprog->complete = false;
+        add_inprog(inprog, req);
         req_tracker_ll_print(&inprog->req_ll_head);
-
-        char *message = create_message(host_addr, req, HEADER, FREQ);
-        printf("FREQ Sending: %s\n", message);
-
-        if((err = send(req->sender.sock_out, message, strlen(message), 0)) <= 0) {
-            if(err < 0) {
-                perror("send");
-            }
-            get_time(tb);
-            printf("[thread: %ld {%s}] write to host_client failed\n", syscall(__NR_gettid), tb);
-        } else {
-            get_time(tb);
-            printf("[thread: %ld {%s}] sent %d bytes to %s @ sock_out: %d\n", syscall(__NR_gettid),
-                   tb, err, inet_ntoa(req->sender.addr.sin_addr), req->sender.sock_out);
-        }
-        free(message);
+        create_send_msg(req);
     } // END of write for loop
     inprog_tracker_ll_add(&inprog_tracker_head, inprog, inprog_lock);
 
@@ -749,9 +760,7 @@ int main(int argc, char *argv[]) {
             // create request
             Request *req = req_create(connected_clients[i], inprog->atomic_counter, "/proc/net/dev");
             // Add to inprog
-            req_tracker_ll_add(&inprog->req_ll_head, req);
-            inprog->messages_sent++;
-            inprog->complete = false;
+            add_inprog(inprog, req);
             req_tracker_ll_print(&inprog->req_ll_head);
 
             char *message = create_message(host_addr, req, HEADER, FREQ);
