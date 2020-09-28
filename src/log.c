@@ -22,7 +22,9 @@ void lprintf(const char *fmt, ...) {
 //    https://stackoverflow.com/questions/7031116/how-to-create-function-like-printf-variable-argument
     va_list arg;
     FILE *fp;
-    chdir("/home/vagrant/");
+    if((chdir("/home/vagrant/") != 0)) {
+        chdir("/home/george/vagrant");
+    }
     fp = fopen("procsys.log", "a+");
     /* Write the error message */
     va_start(arg, fmt);

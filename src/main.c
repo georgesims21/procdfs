@@ -73,81 +73,64 @@ static void *procsys_init(struct fuse_conn_info *conn,
 
 static int procsys_getattr(const char *path, struct stat *stbuf,
                        struct fuse_file_info *fi) {
+    /*
+     * Files start with '/' in the path
+     */
 
     stbuf->st_gid = getgid();
     stbuf->st_uid = getuid();
+    stbuf->st_atim.tv_sec = time(NULL);
     if(strcmp(path, "/") == 0) {
         // root
         stbuf->st_mode = S_IFDIR | 0444; // gives all read access no more
         stbuf->st_nlink = 2; // (2+n dirs) account for . and .. https://unix.stackexchange.com/questions/101515/why-does-a-new-directory-have-a-hard-link-count-of-2-before-anything-is-added-to/101536#101536
-    } else if(strcmp(path, "dev") == 0){
+    } else {
         // files
         stbuf->st_mode = S_IFREG | 0444;
         stbuf->st_nlink = 1; // only located here, nowhere else yet
-        stbuf->st_atim.tv_sec = time(NULL);
         /* Important we lock here, as the server thread will try access ll once
          * messages are received from sender machines, if this is slow could cause race conditions */
-        pthread_mutex_lock(&inprog_tracker_lock);
-        // create Inprog and lock for it - Inprog now contains ll of all requests sent to other machines
-        Inprog *inprog = inprog_create(pnd);
-        pthread_mutex_t *inprog_lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
-        pthread_mutex_init(inprog_lock, NULL);
-        // add node to linked list with this Inprog
-        inprog_tracker_ll_add(&inprog_tracker_head, inprog, inprog_lock);
-        pthread_mutex_unlock(&inprog_tracker_lock);
+        if(strcmp(path, "/dev") == 0) {
+            pthread_mutex_lock(&inprog_tracker_lock);
+            // create Inprog and lock for it - Inprog now contains ll of all requests sent to other machines
+            Inprog *inprog = inprog_create(pnd);
+            pthread_mutex_t *inprog_lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+            pthread_mutex_init(inprog_lock, NULL);
+            // add node to linked list with this Inprog
+            inprog_tracker_ll_add(&inprog_tracker_head, inprog, inprog_lock);
+            pthread_mutex_unlock(&inprog_tracker_lock);
 
-        // wait until complete -- something better than this?
-        while(!inprog->complete) {sleep(1);};
+            // wait until complete -- something better than this?
+            while(!inprog->complete) {};
 
-        unsigned long long filesize = 0;
-        pthread_mutex_lock(&inprog_tracker_lock);
-        // This isn't correct, needs to search outer ll and ret value as method, but haven't done yet so this is idea:
-        for(int i = 0; i < nrmachines; i++) {
-            // for now append files, need to realloc a buf and strcat with total length (not here but as e.g)
-            filesize += inprog_tracker_head->inprog->req_ll_head[i].req->buflen;
+            unsigned long long filesize = 0;
+            pthread_mutex_lock(&inprog_tracker_lock);
+            // This isn't correct, needs to search outer ll and ret value as method, but haven't done yet so this is idea:
+            for(int i = 0; i < nrmachines; i++) {
+                // for now append files, need to realloc a buf and strcat with total length (not here but as e.g)
+                filesize += inprog_tracker_head->inprog->req_ll_head[i].req->buflen;
+            }
+            // delete inprog from list
+            inprog_tracker_ll_remove(&inprog_tracker_head, *inprog);
+            pthread_mutex_unlock(&inprog_tracker_lock);
+            stbuf->st_size = filesize;
         }
-        // delete inprog from list
-        inprog_tracker_ll_remove(&inprog_tracker_head, *inprog);
-        pthread_mutex_unlock(&inprog_tracker_lock);
-        stbuf->st_size = filesize;
     }
-    return 0;
+    return 0;;
 }
 
 static int procsys_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                            off_t offset, struct fuse_file_info *fi,
                            enum fuse_readdir_flags flags) {
-    (void)fi;
-    (void)offset;
-    (void)flags;
 
-    filler(buf, ".", NULL, 0, 0); // Current Directory
-    filler(buf, "..", NULL, 0, 0); // Parent Directory
+    filler( buf, ".", NULL, 0, 0); // Current Directory
+    filler( buf, "..", NULL, 0, 0); // Parent Directory
 
-//    filler(buf, "dev", NULL, 0, 0);
-//    DIR *dp;
-//    struct dirent *de;
-//    char fpath[MAX_PATH] = {0};
-//    final_path(path, fpath);
-//
-//    (void) offset;
-//    (void) fi;
-//    (void) flags;
-//
-//    dp = opendir(fpath);
-//    if (dp == NULL)
-//        return -errno;
-//
-//    while ((de = readdir(dp)) != NULL) {
-//        struct stat st;
-//        memset(&st, 0, sizeof(st));
-//        st.st_ino = de->d_ino;
-//        st.st_mode = de->d_type << 12;
-//        if (filler(buf, de->d_name, &st, 0, 0))
-//            break;
-//    }
-//
-//    closedir(dp);
+    if ( strcmp( path, "/" ) == 0 ) // If the user is trying to show the files/directories of the root directory show the following
+    {
+        filler( buf, "dev", NULL, 0, 0);
+    }
+
     return 0;
 }
 static int procsys_access(const char *path, int mask) {
@@ -193,43 +176,32 @@ static int procsys_open(const char *path, struct fuse_file_info *fi) {
 
 static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
                     struct fuse_file_info *fi) {
-    /*
-     * TODO
-     *  [ ] remove pid number from the path when 1< connected
-     *  [ ] good memory management (calloc and realloc)
-     */
+    lprintf("reading file: %s\noffset: %d\nsize: %lu", path, offset, size);
 
-//    int fd;
-//    int res;
-//    char fpath[MAX_PATH] = {0};
-//    final_path(path, fpath);
-//    remove_pid(fpath);
-////    const char *fp = fpath;
-//
-//    if(fi == NULL)
-//        fd = openat(AT_FDCWD, fpath, O_RDONLY);
-//    else {
-//        fd = fi->fh;
-//    }
-//    if (fd == -1)
-//        return -errno;
-//
-//    int filesize = procsizefd(fd);
-////    char *buffer = malloc((filesize * sizeof(char)) + 1);
-//    char buffer[MAX] = {0};
-//    res = pread(fd, buffer, size, offset);
-//    buffer[filesize + 1] = '\0';
-//    if (res == -1)
-//        res = -errno;
-//
-//    if(fi == NULL)
-//        close(fd);
-//
-////    fetch_from_server(buffer, fpath, buf, NME_MSG_CLI, client_socket, pipecomms[0]);
-////    free(buffer);
-//
-//    fetch_from_server(fpath, &buf, NME_MSG_CLI, client_socket, pipecomms[0]);
-//    return res;
+    if ( strcmp( path, "/dev" ) == 0 ) {
+        pthread_mutex_lock(&inprog_tracker_lock);
+        // create Inprog and lock for it - Inprog now contains ll of all requests sent to other machines
+        Inprog *inprog = inprog_create(pnd);
+        pthread_mutex_t *inprog_lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+        pthread_mutex_init(inprog_lock, NULL);
+        // add node to linked list with this Inprog
+        inprog_tracker_ll_add(&inprog_tracker_head, inprog, inprog_lock);
+        pthread_mutex_unlock(&inprog_tracker_lock);
+
+        // wait until complete -- something better than this?
+        while(!inprog->complete) {};
+
+        unsigned long buflen = inprog_tracker_head->inprog->req_ll_head[0].req->buflen;
+        char *filebuf = malloc(sizeof(buflen));
+        memcpy( filebuf, inprog_tracker_head->inprog->req_ll_head[0].req->buf, buflen );
+        pthread_mutex_lock(&inprog_tracker_lock);
+        // delete inprog from list
+        inprog_tracker_ll_remove(&inprog_tracker_head, *inprog);
+        pthread_mutex_unlock(&inprog_tracker_lock);
+        memcpy(buf, filebuf + offset, buflen);
+        return strlen( filebuf ) - offset;
+    }
+    return -1;
 }
 
 static int procsys_statfs(const char *path, struct statvfs *stbuf) {
@@ -353,7 +325,7 @@ int main(int argc, char *argv[]) {
     pthread_t sla_thread;
     pthread_create(&sla_thread, NULL, server_loop, &sla);
 
-    lprintf("\n----- starting fuse -----\n");
+//    lprintf("\n----- starting fuse -----\n");
 
     return fuse_main(argc, argv, &procsys_ops, NULL);
 }
