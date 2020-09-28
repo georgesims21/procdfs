@@ -1,4 +1,5 @@
 #include "ds_new.h"
+#include "log.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -79,7 +80,7 @@ void req_tracker_ll_print(Request_tracker_node **head) {
 
     if(listptr != NULL) {
         while (listptr != NULL) {
-            printf("req_tracker_ll[%d]:\nAtomic counter: %llu\n"
+            lprintf("req_tracker_ll[%d]:\nAtomic counter: %llu\n"
                    "File path: %s\n"
                    "Sock_in: %d\n"
                    "Sock_out: %d\n"
@@ -103,7 +104,7 @@ void req_tracker_ll_print(Request_tracker_node **head) {
         }
         return;
     }
-    printf("List empty!\n");
+    lprintf("List empty!\n");
 }
 
 int request_ll_free(Request_tracker_node **head) {
@@ -111,7 +112,7 @@ int request_ll_free(Request_tracker_node **head) {
     Request_tracker_node *reqptr = *head;
     Request_tracker_node *next;
     if(reqptr == NULL) {
-        printf("The list is empty! Not freeing anything\n");
+        lprintf("The list is empty! Not freeing anything\n");
         return -1;
     }
     while(reqptr != NULL) {
@@ -131,7 +132,7 @@ int request_ll_complete(Request_tracker_node **head) {
     Request_tracker_node *next;
     int count = 0;
     if(reqptr == NULL) {
-        printf("The list is empty! Not freeing anything\n");
+        lprintf("The list is empty! Not freeing anything\n");
         return -1;
     }
     while(reqptr != NULL) {
@@ -148,23 +149,19 @@ int request_ll_complete(Request_tracker_node **head) {
 int inprog_add_buf(Request *req, Inprog *inprog, pthread_mutex_t *inprog_lock) {
 
     Request_tracker_node *rtn;
-    printf("before lock\n");
     pthread_mutex_lock(inprog_lock);
-    printf("after lock\n");
     if((rtn = req_tracker_ll_fetch(&inprog->req_ll_head, *req)) != NULL) {
         // Realloc this rtn and copy buflen and buf into it, now it is complete
-        printf("Request found!\n");
         rtn->req->buflen = req->buflen;
         rtn->req = realloc(rtn->req, sizeof(Request) + req->buflen);
         memset(rtn->req->buf, 0, req->buflen);
         strcpy(rtn->req->buf, req->buf);
         rtn->req->complete = true;
-        printf("After adding buffer:\n");
         req_tracker_ll_print(&inprog->req_ll_head);
         // check if all requests (inc. this one) have been received
         if(request_ll_complete(&inprog->req_ll_head) == inprog->messages_sent) {
             inprog->complete = true;
-            printf("All messages received!\n");
+            lprintf("All messages received!\n");
         }
     } else {
         printf("Request not contained within the linked list, exiting...\n");
@@ -210,7 +207,7 @@ int inprog_tracker_ll_add(Inprog_tracker_node **head, Inprog *inprog, pthread_mu
 void inprog_tracker_ll_print(Inprog_tracker_node **head) {
 
     if(head == NULL) {
-        printf("List empty!\n");
+        lprintf("List empty!\n");
         return;
     }
 
@@ -219,7 +216,7 @@ void inprog_tracker_ll_print(Inprog_tracker_node **head) {
 
     if(listptr != NULL) {
         while (listptr != NULL) {
-            printf("inprog_tracker_ll[%d]:\nAtomic counter: %llu\n"
+            lprintf("inprog_tracker_ll[%d]:\nAtomic counter: %llu\n"
                    "Complete: %d\n"
                    "Messages sent: %d\n"
                    "\n",
@@ -233,7 +230,7 @@ void inprog_tracker_ll_print(Inprog_tracker_node **head) {
         }
         return;
     }
-    printf("List empty!\n");
+    lprintf("List empty!\n");
 }
 
 Inprog_tracker_node *inprog_tracker_ll_fetch(Inprog_tracker_node **head, Request req) {
@@ -263,7 +260,7 @@ int inprog_tracker_ll_remove(Inprog_tracker_node **head, Inprog inprog) {
     Inprog_tracker_node *next;
     Inprog_tracker_node *tmp;
     if(reqptr == NULL) {
-        printf("The list is empty! Not freeing anything\n");
+        lprintf("The list is empty! Not freeing anything\n");
         return -1;
     } else if (inprog.req_ll_head == NULL) {
         printf("Empty Inprog, exiting..\n");

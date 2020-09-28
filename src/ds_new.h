@@ -4,6 +4,7 @@
 #include <glob.h>
 #include <netinet/in.h>
 #include <stdbool.h>
+#include <pthread.h>
 
 #define MAXPATH 64
 
@@ -41,6 +42,14 @@ typedef struct inprog_tracker_node {
     struct inprog_tracker_node *next;
 }Inprog_tracker_node;
 
+extern int nrmachines;
+extern long long a_counter;
+extern Address host_addr;
+extern Address *connected_clients;
+extern Inprog_tracker_node *inprog_tracker_head;
+extern pthread_mutex_t connected_clients_lock;
+extern pthread_mutex_t inprog_tracker_lock;
+extern pthread_mutex_t a_counter_lock;
 
 int req_tracker_ll_add(Request_tracker_node **head, Request *req);
 void req_tracker_ll_print(Request_tracker_node **head);

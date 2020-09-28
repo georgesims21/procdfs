@@ -112,56 +112,6 @@ static int contained_within(Address *addr, Address lookup, int arrlen);
 static void paccept(Address host_addr, Address *client_addr);
 static int search_IPs(in_addr_t conn, const char *filename);
 char *create_message(Address host_addr, Request *req, int headerlen, int flag);
-
-/*
- * struct create_request_args {
- *      struct Request *req;
- *      int req_len; // length of request struct
- *      char *content; // malloc'ed
- *      int con_len; // length of content buffer
- * };
- */
-
-/*
- * STATIC create_request - by server thread n
- * @param   void* - pass create_request_args struct
- * @ret     NULL
- *
- * convert all ints to chars like I did with flags
- * convert given Request struct into a buffer
- * https://stackoverflow.com/questions/8000851/passing-a-struct-over-tcp-sock-stream-socket-in-c
- */
-
-
-/*
- * struct mark_as_received_args {
- *      struct Request *req;
- *      int req_len; // length of request struct
- *      mutex_lock_t inprog_tracker_ll_lock;
- *      int *inpr_ll_ptr; // head of Inprog_tracker_ll
- * };
- */
-
-/*
- * STATIC mark_as_received - by server thread n
- * @param   void* - pass mark_as_received_args struct
- * @ret     NULL
- *
- *      mutex_lock(inprog_tracker_ll_lock)
- *      create iterator pointers **inprgpt, **reqpt, **reqpt2;
- *      find correct request struct using counter (req->atomiccounter == *inprgpt->inpt->atomiccounter)
- *      point *reqpt to *inprgpt->inpt->*req_ll_ptr
- *      find correct sender IP (req->...->sin_addr == *reqpt->inpt->req->sender->addr->sin_addr->sin_addr)
- *      check correct sender port (req->...->sin_port == *reqpt->inpt->req->sender->addr->sin_port)
- *      add file content to buf (req->buf = *reqpt->inpt->req->buf)
- *      mark as received (*reqpt->inpt->req->received = 1)
- *      point *reqpt2 to *inprgpt->inpt->*req_ll_ptr
- *          while(*reqpt2->next =! NULL)
- *          if(*reqpt2->req->received == 1)
- *              count++
- *          if(count == *inprgpt->sent_msgs)
- *              *inprgpt->inpt->complete = 1
- *      mutex_unlock(inprog_tracker_ll_lock)
- */
+Inprog *inprog_create(char *path);
 
 #endif //PROCSYS_SERVER_NEW_H
