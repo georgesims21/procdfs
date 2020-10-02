@@ -1,4 +1,5 @@
 #include <arpa/inet.h>
+#include <pwd.h>
 #include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,10 +19,21 @@
 #include <sys/types.h>
 #include <sys/syscall.h>
 #include <fcntl.h>
+#include <stdarg.h>
+
+#include "log.h"
 #include "server_new.h"
 #include "ds_new.h"
 
 char tb[26];
+//int nrmachines;
+//long long a_counter;
+//Address host_addr;
+//Address *connected_clients;
+//Inprog_tracker_node *inprog_tracker_head;
+//pthread_mutex_t connected_clients_lock = PTHREAD_MUTEX_INITIALIZER;;
+//pthread_mutex_t inprog_tracker_lock = PTHREAD_MUTEX_INITIALIZER;;
+//pthread_mutex_t a_counter_lock = PTHREAD_MUTEX_INITIALIZER;
 
 void get_time(char *buf) {
 //    get_time(tb);
@@ -42,6 +54,33 @@ void get_time(char *buf) {
     tm_info = localtime(&tv.tv_sec);
     strftime(buffer, 26, "%M:%S", tm_info);
     sprintf(buf, "%s.%03d", buffer, millisec);
+}
+
+void lprintf(const char *fmt, ...) {
+//    https://stackoverflow.com/questions/7031116/how-to-create-function-like-printf-variable-argument
+    va_list arg;
+    FILE *fp;
+//    if(strcmp(inet_ntoa(host_addr.addr.sin_addr), "172.28.128.1") == 0) {
+//        chdir("/home/george/vagrant");
+//    } else {
+//        chdir("/home/vagrant/");
+//    }
+//    chdir("$HOME/vagrant/");
+    struct passwd *pw = getpwuid(getuid());
+    const char *homedir = pw->pw_dir;
+    char logfile[32] = {0};
+    snprintf(logfile, 32, "%s/procsys.log", homedir);
+    printf("logfile: %s\n\n", logfile);
+    fp = fopen(logfile, "a+");
+    if(!fp) {
+        perror("fopen");
+        exit(EXIT_FAILURE);
+    }
+    /* Write the error message */
+    va_start(arg, fmt);
+    vfprintf(fp, fmt, arg);
+    va_end(arg);
+    fclose(fp);
 }
 
 int init_server(Address *address, int queue_length, int port_number, const char *interface) {
@@ -427,25 +466,28 @@ int extract_header(char **bufptr, int *char_count, Request *req, Address host_ad
     char senderPort[16] = {0};
     char hostIP[32] = {0};
     char hostPort[16] = {0};
-    char a_counter[8] = {0};
+    char aa_counter[8] = {0};
     char path[MAXPATH] = {0};
 
     fetch_upto_delim(bufptr, senderIP, char_count);
     fetch_upto_delim(bufptr, senderPort, char_count);
     fetch_upto_delim(bufptr, hostIP, char_count);
     fetch_upto_delim(bufptr, hostPort, char_count);
+
+//    lprintf("senderIP: %s\nsenderPort: %s\nhostIP: %s\nhostPort: %s\naa_counter: %s\npath: %s\n",
+//            senderIP, senderPort, hostIP, hostPort, aa_counter, path);
     // check whether given hostIP matches actual
-    if(!(inet_addr(hostIP) == host_addr.addr.sin_addr.s_addr) ||
-       !(htons(atoi(hostPort)) == host_addr.addr.sin_port)) {
+    if(inet_addr(hostIP) != host_addr.addr.sin_addr.s_addr ||
+       htons(atoi(hostPort)) != host_addr.addr.sin_port) {
         printf("Doesn't match the hostIP address and port, exiting...\n");
         exit(EXIT_FAILURE);
     }
-    fetch_upto_delim(bufptr, a_counter, char_count);
+    fetch_upto_delim(bufptr, aa_counter, char_count);
     fetch_upto_delim(bufptr, path, char_count);
 
     req->sender.addr.sin_addr.s_addr = inet_addr(senderIP);
     req->sender.addr.sin_port = htons(atoi(senderPort));
-    req->atomic_counter = strtoll(a_counter, NULL, 10);
+    req->atomic_counter = strtoll(aa_counter, NULL, 10);
     strncpy(req->path, path, strlen(path));
     return 0;
 }
@@ -477,6 +519,67 @@ int extract_buffer(char **bufptr, int *char_count, Request *req, Address host_ad
     return 0;
 }
 
+Request *req_create(Address sender, long long counter, char *path) {
+
+    Request *req = (Request *)malloc(sizeof(Request));
+    memset(req, 0, sizeof(Request));
+    // fill in request struct with info
+    req->sender = sender;
+    req->atomic_counter = counter;
+    snprintf(req->path, MAXPATH, "%s", path);
+    return req;
+}
+
+int add_inprog(Inprog *inprog, Request *req) {
+
+    // Add to inprog
+    req_tracker_ll_add(&inprog->req_ll_head, req);
+    inprog->messages_sent++;
+    inprog->complete = false;
+    return 0;
+}
+
+int create_send_msg(Request *req) {
+
+    int err = 0;
+    char *message = create_message(host_addr, req, HEADER, FREQ);
+//    lprintf("FREQ Sending: %s\n", message);
+
+    if((err = send(req->sender.sock_out, message, strlen(message), 0)) <= 0) {
+        if(err < 0) {
+            perror("send");
+        }
+        get_time(tb);
+//        lprintf("[thread: %ld {%s}] write to host_client failed\n", syscall(__NR_gettid), tb);
+    } else {
+        get_time(tb);
+//        lprintf("[thread: %ld {%s}] sent %d bytes to %s @ sock_out: %d\n", syscall(__NR_gettid),
+//               tb, err, inet_ntoa(req->sender.addr.sin_addr), req->sender.sock_out);
+    }
+    free(message);
+    return 0;
+}
+
+Inprog *inprog_create(char *path) {
+
+    int err = 0;
+    Inprog *inprog = (Inprog *)malloc(sizeof(Inprog));
+    memset(inprog, 0, sizeof(Inprog));
+    inprog->complete = false;
+    pthread_mutex_lock(&a_counter_lock);
+    a_counter++; // only increment this on new request NOT each machine (reserve 0)
+    inprog->atomic_counter = a_counter;
+    pthread_mutex_unlock(&a_counter_lock);
+    for(int i = 0; i < nrmachines; i++) {
+        // create request
+        Request *req = req_create(connected_clients[i], inprog->atomic_counter, path);
+        add_inprog(inprog, req); // adding single request to internal inprog linked list
+        req_tracker_ll_print(&inprog->req_ll_head);
+        create_send_msg(req);
+    } // END of write for loop
+    return inprog;
+}
+
 void *server_loop(void *arg) {
 
     struct server_loop_args *args = (struct server_loop_args *)arg;
@@ -503,19 +606,21 @@ void *server_loop(void *arg) {
                              * (extra) make into void method
                          * 2: content received
                              * (extra) make into void method
-                     * Going to need the inprog_tracker_node ll as global so fuse can access
+                         * will need to read size_t + 1 eventually to account for MAX long long + '-'.. will
+                         break if this happens
                  */
                 int counter = 0, flag = 0;
                 Request *req = (Request *)malloc(sizeof(Request));
                 memset(req, 0, sizeof(Request));
                 char *buf = calloc(0, sizeof(size_t) + 1);
                 int read_bytes = recv(pfds[i].fd, buf, sizeof(size_t), 0); // assuming we read 8 bytes and not less
-                printf("Received %d bytes\n", read_bytes);
+//                lprintf("Received %d bytes\n", read_bytes);
                 if(read_bytes <= 0) {
                     get_time(tb);
                     printf("[thread: %ld {%s}] disconnection, exiting..\n", syscall(__NR_gettid), tb);
                     exit(EXIT_SUCCESS);
                 }
+                // break down first 8 bytes (size_t), collecting size and whatever is left -----
                 int total = fetch_size(buf, &counter);
                 int char_count = total;
                 buf = realloc(buf, sizeof(char) * total + 1);
@@ -524,29 +629,30 @@ void *server_loop(void *arg) {
                 char *e_ptr = contentbuf;
                 strncpy(contentbuf, &buf[counter], read_bytes - counter + 1);
                 int rem_bytes = total - read_bytes + counter; // already read 8 bytes, but size not included in total
+                // now read remaining string using sizes we extracted            -----
                 while(rem_bytes > 0) {
                     // could have new var from recv and use that in an strncat
                     rem_bytes -= recv(pfds[i].fd, buf, rem_bytes, 0);
                     strcat(contentbuf, buf);
                 }
                 get_time(tb);
-                printf("[thread: %ld {%s}] (%d) bytes received: %s\n", syscall(__NR_gettid), tb,
-                       total, contentbuf);
-                // now we have a request struct we can switch for what we need
+//                lprintf("[thread: %ld {%s}] (%d) bytes received: %s\n", syscall(__NR_gettid), tb,
+//                       total, contentbuf);
+                // get everything from rest of buffer and save into request
                 extract_buffer(&e_ptr, &char_count, req, args->host_addr, args->conn_clients,
                                args->conn_clients_lock, &flag, args->arrlen);
                 switch(flag) {
                     case FREQ: { // 1: other machine requesting file content
-                        printf("File request received\n");
+//                        lprintf("File request received\n");
                         int fd = -1, res = 0, offset = 0, size = 0, err = 0;
                         fd = openat(AT_FDCWD, req->path, O_RDONLY);
                         if (fd == -1) {
                             perror("openat");
                             exit (EXIT_FAILURE);
                         }
-                        size = procsizefd(fd);
+                        size = procsizefd(fd); // individually count chars in proc file - bottleneck for large fs
                         char *procbuf = malloc(sizeof(char) * size);
-                        printf("procsize: %d\n", size);
+//                        lprintf("procsize: %d\n", size);
 
                         res = pread(fd, procbuf, size, offset);
                         if (res == -1) {
@@ -554,29 +660,34 @@ void *server_loop(void *arg) {
                             exit(EXIT_FAILURE);
                         }
                         req->buflen = size;
-                        req = realloc(req, sizeof(Request) + req->buflen);
+                        req = realloc(req, sizeof(Request) + req->buflen); // flexible array member use
                         memset(req->buf, 0, sizeof(req->buflen));
                         snprintf(req->buf, req->buflen, "%s", procbuf);
                         free(procbuf);
-                        // send the req back to the sender
+                        // send the req back to the sender (should use new create_and_send_msg method)
                         char *message = create_message(args->host_addr, req, HEADER, FCNT);
-                        printf("FCNT Sending: %s\n", message);
+//                        lprintf("FCNT Sending: %s\n", message);
                         if((err = send(req->sender.sock_out, message, strlen(message) + 1, 0)) <= 0) {
                             if(err < 0) {
                                 perror("send");
                             }
                             get_time(tb);
-                            printf("[thread: %ld {%s}] write to host_client failed\n", syscall(__NR_gettid), tb);
+//                            lprintf("[thread: %ld {%s}] write to host_client failed\n", syscall(__NR_gettid), tb);
                         } else {
                             get_time(tb);
-                            printf("[thread: %ld {%s}] sent %d bytes to %s @ sock_out: %d\n", syscall(__NR_gettid),
-                                   tb, err, inet_ntoa(req->sender.addr.sin_addr), req->sender.sock_out);
+//                            lprintf("[thread: %ld {%s}] sent %d bytes to %s @ sock_out: %d\n", syscall(__NR_gettid),
+//                                   tb, err, inet_ntoa(req->sender.addr.sin_addr), req->sender.sock_out);
                         }
                         free(message);
                         break;
                     }
                     case FCNT: // 2: this machine receiving a response with content
-                        printf("File content received\n");
+                    /*
+                     * TODO
+                         * buflen shouldn't + 1 when concatting them, n machines would lead to n - 1
+                         bytes too many read when the filesystem has to deal with them
+                     */
+//                        lprintf("File content received\n");
                         req->buflen = char_count + 1; // char count includes 0 index so must add 1
                         req = realloc(req, sizeof(Request) + req->buflen);
                         memset(req->buf, 0, req->buflen);
@@ -586,7 +697,13 @@ void *server_loop(void *arg) {
                             e_ptr++;
                             char_count--;
                         }
-                        inprog_add_buf(req, args->inprog, args->inprog_lock);
+                        pthread_mutex_lock(&inprog_tracker_lock);
+                        // find this request in the upper linked list and return node
+                        struct inprog_tracker_node *node = inprog_tracker_ll_fetch(&inprog_tracker_head, *req);
+                        // add file buf received from other machine to the request (also checks if Inprog == complete)
+                        inprog_add_buf(req, node->inprog, node->inprog_lock);
+                        inprog_tracker_ll_print(&inprog_tracker_head);
+                        pthread_mutex_unlock(&inprog_tracker_lock);
                         break;
                     default:
                         break;
@@ -615,26 +732,16 @@ void *server_loop(void *arg) {
 //        exit(EXIT_FAILURE);
 //    }
 //    int err;
-//    int nrmachines = (int)nrm - 1; // to account for this machine (not adding to connected clients)
+//    nrmachines = (int)nrm - 1; // to account for this machine (not adding to connected clients)
 //    int portnr = (int)pnr;
 //
 //    printf("Connecting to other machines..\n");
-//    Address host_addr;
 //    memset(&host_addr, 0, sizeof(host_addr));
 //    init_server(&host_addr, nrmachines, portnr, infc);
 //
 //    // init Address arrays and their corresponding mutex locks
-//    Address connected_clients[nrmachines];
-//    memset(connected_clients, 0, sizeof(Address) * (nrmachines));
-//    pthread_mutex_t connected_clients_lock = PTHREAD_MUTEX_INITIALIZER;;
-//
-//    Inprog *inprog = (Inprog *)malloc(sizeof(Inprog));
-//    if(inprog == NULL) {
-//        perror("malloc");
-//        exit(EXIT_FAILURE);
-//    }
-//    memset(inprog, 0, sizeof(Inprog));
-//    pthread_mutex_t inprog_lock = PTHREAD_MUTEX_INITIALIZER;
+//    connected_clients = (Address *)malloc(sizeof(Address) * nrmachines);
+//    memset(connected_clients, 0, sizeof(Address) * nrmachines);
 //
 //    // accept all incoming connections until have sock_in for all machines in list
 //    struct accept_connection_args aca = {connected_clients, &connected_clients_lock,
@@ -662,53 +769,29 @@ void *server_loop(void *arg) {
 //
 //    // start server loop to listen for connections
 //    struct server_loop_args sla = {connected_clients, &connected_clients_lock,
-//                                   inprog, &inprog_lock,
 //                                   host_addr, nrmachines, fn};
 //    pthread_t sla_thread;
 //    pthread_create(&sla_thread, NULL, server_loop, &sla);
 //
-//    long long a_counter = 0;
-//    pthread_mutex_t a_counter_lock = PTHREAD_MUTEX_INITIALIZER;
 //    char buf[1024];
 //    Address ad;
 //    for(;;) {
 //        printf("~ ");
 //        scanf("%s", buf);
-//        pthread_mutex_lock(&a_counter_lock);
-//        a_counter++; // only increment this on new request NOT each machine
-//        for(int i = 0; i < nrmachines; i++) {
-//            // create request
-//            Request *req = (Request *)malloc(sizeof(Request));
-//            memset(req, 0, sizeof(Request));
-//            // fill in request struct with info
-//            req->sender = connected_clients[i];
-//            req->atomic_counter = inprog->atomic_counter = a_counter;
-//            pthread_mutex_unlock(&a_counter_lock);
-//            snprintf(req->path, MAXPATH, "/proc/net/dev");
-//            // Add to inprog
-//            pthread_mutex_lock(&inprog_lock);
-//            req_tracker_ll_add(&inprog->req_ll_head, req);
-//            inprog->messages_sent++;
-//            inprog->complete = false;
-//            req_tracker_ll_print(&inprog->req_ll_head);
-//            pthread_mutex_unlock(&inprog_lock);
-//
-//            char *message = create_message(host_addr, req, HEADER, FREQ);
-//            printf("FREQ Sending: %s\n", message);
-//
-//            if((err = send(req->sender.sock_out, message, strlen(message), 0)) <= 0) {
-//                if(err < 0) {
-//                    perror("send");
-//                }
-//                get_time(tb);
-//                printf("[thread: %ld {%s}] write to host_client failed\n", syscall(__NR_gettid), tb);
-//            } else {
-//                get_time(tb);
-//                printf("[thread: %ld {%s}] sent %d bytes to %s @ sock_out: %d\n", syscall(__NR_gettid),
-//                       tb, err, inet_ntoa(req->sender.addr.sin_addr), req->sender.sock_out);
-//            }
-//            free(message);
-//        } // END of write for loop
+//        pthread_mutex_lock(&inprog_tracker_lock);
+//        // create Inprog and lock
+//        Inprog *inprog = inprog_create("/proc/net/dev");
+//        pthread_mutex_t *inprog_lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+//        pthread_mutex_init(inprog_lock, NULL);
+//        // create node in linked list
+//        inprog_tracker_ll_add(&inprog_tracker_head, inprog, inprog_lock);
+//        pthread_mutex_unlock(&inprog_tracker_lock);
+//        // wait until complete
+//        while(!inprog->complete) {sleep(1);};
+//        pthread_mutex_lock(&inprog_tracker_lock);
+//        // delete inprog from list
+//        inprog_tracker_ll_remove(&inprog_tracker_head, *inprog);
+//        pthread_mutex_unlock(&inprog_tracker_lock);
 //    } // END of inf for loop
 //    return 0;
 //}

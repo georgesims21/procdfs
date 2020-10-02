@@ -1,10 +1,13 @@
 # procsys
 Once cloned run:
 ```bash
-cmake [-DCMAKE_BUILD_TYPE=Debug] . # from root dir
-make -j # for multithreaded make
+mkdir build
+cd build
 mkdir <mountdir>
-./src/main.c [-f -s -d] <mountdir> # Use flags for running in foreground, single threaded for debugging
+cmake [-DCMAKE_BUILD_TYPE=Debug] ..
+make -j # for multithreaded make
+./procsys [-f -s -d] <mountdir> <total-machines> <port-number> \
+    <interface-name> <ipfile> # Use flags for running in foreground, single threaded for debugging
 ```
 
 ## Introduction
@@ -45,12 +48,12 @@ TODO:
       (basic client/server model that I assumed)
 
     - [x] 2.1: Build a basic client-server model and assume a TCP connection
-    - [x] 2.3: Merge logic into filesystem
-      - [x] 2.3.1: First model should use server to do all work and comms between clients
+      - [x] 2.1.1: First model should use server to do all work and comms between clients
           - [plan](doc/networking-read()call-flowchart.pdf)
-      - [] 2.3.2: Second model should have all fs' as servers and clients to each other
-    - [ ] 2.4: Congregate some files and run tests with net-tools
-    - [ ] 2.5 (extra): Convert it into a secure client-server with openssl libs
+      - [x] 2.1.2: Second model should have all fs' as servers and clients to each other
+    - [ ] 2.2: Merge logic into filesystem
+    - [ ] 2.3: Congregate some files and run tests with net-tools
+    - [ ] 2.4 (extra): Convert it into a secure client-server with openssl libs
 
 - [ ] 3: **Hijacking**   
       Fakeroot pretends that you are root. It will give a different file system

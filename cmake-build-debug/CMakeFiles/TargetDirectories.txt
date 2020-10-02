@@ -1,3 +1,0 @@
-/home/george/github/procsys/cmake-build-debug/CMakeFiles/rebuild_cache.dir
-/home/george/github/procsys/cmake-build-debug/CMakeFiles/edit_cache.dir
-/home/george/github/procsys/cmake-build-debug/CMakeFiles/procsys.dir
