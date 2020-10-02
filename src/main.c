@@ -76,6 +76,7 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
     /*
      * Files start with '/' in the path
      */
+//    lprintf("getattr called on : %s\n", path);
 
     stbuf->st_gid = getgid();
     stbuf->st_uid = getuid();
@@ -133,6 +134,49 @@ static int procsys_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
     return 0;
 }
+
+static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
+                        struct fuse_file_info *fi) {
+//    lprintf("\n\nreading file: %s\noffset: %d\nsize: %lu\n", path, offset, size);
+
+    if ( strcmp( path, "/dev" ) == 0 ) {
+        pthread_mutex_lock(&inprog_tracker_lock);
+        // create Inprog and lock for it - Inprog now contains ll of all requests sent to other machines
+        Inprog *inprog = inprog_create(pnd);
+        pthread_mutex_t *inprog_lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+        pthread_mutex_init(inprog_lock, NULL);
+        // add node to linked list with this Inprog
+        inprog_tracker_ll_add(&inprog_tracker_head, inprog, inprog_lock);
+        pthread_mutex_unlock(&inprog_tracker_lock);
+
+        // wait until complete -- something better than this?
+        while(!inprog->complete) {};
+
+        size_t buflen = inprog_tracker_head->inprog->req_ll_head[0].req->buflen;
+        char *filebuf = malloc(sizeof(buflen));
+        memcpy( filebuf, inprog_tracker_head->inprog->req_ll_head[0].req->buf, buflen );
+        pthread_mutex_lock(&inprog_tracker_lock);
+        // delete inprog from list
+        inprog_tracker_ll_remove(&inprog_tracker_head, *inprog);
+        pthread_mutex_unlock(&inprog_tracker_lock);
+//        if (offset >= buflen) {
+//            return 0;
+//        }
+//
+//        if (offset + size > buflen) {
+//            memcpy(buf, filebuf + offset, buflen - offset);
+//            return buflen - offset;
+//        }
+//
+//        memcpy(buf, filebuf + offset, size);
+//        return size;
+
+        memcpy(buf, filebuf + offset, buflen);
+        return strlen( filebuf ) - offset;
+    }
+    return -ENOENT;
+}
+
 static int procsys_access(const char *path, int mask) {
 
 //    int res;
@@ -172,36 +216,6 @@ static int procsys_open(const char *path, struct fuse_file_info *fi) {
 //
 //    fi->fh = res;
     return 0;
-}
-
-static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
-                    struct fuse_file_info *fi) {
-    lprintf("reading file: %s\noffset: %d\nsize: %lu", path, offset, size);
-
-    if ( strcmp( path, "/dev" ) == 0 ) {
-        pthread_mutex_lock(&inprog_tracker_lock);
-        // create Inprog and lock for it - Inprog now contains ll of all requests sent to other machines
-        Inprog *inprog = inprog_create(pnd);
-        pthread_mutex_t *inprog_lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
-        pthread_mutex_init(inprog_lock, NULL);
-        // add node to linked list with this Inprog
-        inprog_tracker_ll_add(&inprog_tracker_head, inprog, inprog_lock);
-        pthread_mutex_unlock(&inprog_tracker_lock);
-
-        // wait until complete -- something better than this?
-        while(!inprog->complete) {};
-
-        unsigned long buflen = inprog_tracker_head->inprog->req_ll_head[0].req->buflen;
-        char *filebuf = malloc(sizeof(buflen));
-        memcpy( filebuf, inprog_tracker_head->inprog->req_ll_head[0].req->buf, buflen );
-        pthread_mutex_lock(&inprog_tracker_lock);
-        // delete inprog from list
-        inprog_tracker_ll_remove(&inprog_tracker_head, *inprog);
-        pthread_mutex_unlock(&inprog_tracker_lock);
-        memcpy(buf, filebuf + offset, buflen);
-        return strlen( filebuf ) - offset;
-    }
-    return -1;
 }
 
 static int procsys_statfs(const char *path, struct statvfs *stbuf) {
@@ -264,7 +278,7 @@ static const struct fuse_operations procsys_ops = {
 int main(int argc, char *argv[]) {
     if(argc < 6) {
         printf("Not enough arguments given, at least 5 expected: "
-               "mountpoint total-machines port-number interface-name ipfile\n");
+               "[fuse flags] mountpoint total-machines port-number interface-name ipfile\n");
         exit(EXIT_FAILURE);
     }
     printf("argc: %d\n", argc);
