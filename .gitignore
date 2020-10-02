@@ -1,11 +1,9 @@
-test/net-tools-code
 bin/
 cmake-build-debug/
 CMakeFiles/
 include/
 lib/
 src/test*
-test/net-tools-code
 Makefile
 *.cbp
 CMake/
@@ -14,3 +12,4 @@ cmake_install.cmake
 compile_commands.json
 procsys
 .idea
+*build*/
