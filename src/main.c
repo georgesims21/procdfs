@@ -4,7 +4,7 @@
 #define FUSE_USE_VERSION 35
 
 #ifdef HAVE_CONFIG_H
-#include <fuse3/config.h>
+#include <config.h>
 #endif
 
 #define _GNU_SOURCE
@@ -14,7 +14,7 @@
 #define _XOPEN_SOURCE 700
 #endif
 
-#include <fuse3/fuse.h>
+#include <fuse.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -76,7 +76,7 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
     /*
      * Files start with '/' in the path
      */
-//    lprintf("getattr called on : %s\n", path);
+    printf("getattr called on : %s\n", path);
 
     stbuf->st_gid = getgid();
     stbuf->st_uid = getuid();
@@ -92,29 +92,30 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
         /* Important we lock here, as the server thread will try access ll once
          * messages are received from sender machines, if this is slow could cause race conditions */
         if(strcmp(path, "/dev") == 0) {
-            pthread_mutex_lock(&inprog_tracker_lock);
-            // create Inprog and lock for it - Inprog now contains ll of all requests sent to other machines
-            Inprog *inprog = inprog_create(pnd);
-            pthread_mutex_t *inprog_lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
-            pthread_mutex_init(inprog_lock, NULL);
-            // add node to linked list with this Inprog
-            inprog_tracker_ll_add(&inprog_tracker_head, inprog, inprog_lock);
-            pthread_mutex_unlock(&inprog_tracker_lock);
-
-            // wait until complete -- something better than this?
-            while(!inprog->complete) {};
-
-            unsigned long long filesize = 0;
-            pthread_mutex_lock(&inprog_tracker_lock);
-            // This isn't correct, needs to search outer ll and ret value as method, but haven't done yet so this is idea:
-            for(int i = 0; i < nrmachines; i++) {
-                // for now append files, need to realloc a buf and strcat with total length (not here but as e.g)
-                filesize += inprog_tracker_head->inprog->req_ll_head[i].req->buflen;
-            }
-            // delete inprog from list
-            inprog_tracker_ll_remove(&inprog_tracker_head, *inprog);
-            pthread_mutex_unlock(&inprog_tracker_lock);
-            stbuf->st_size = filesize;
+//            pthread_mutex_lock(&inprog_tracker_lock);
+//            // create Inprog and lock for it - Inprog now contains ll of all requests sent to other machines
+//            Inprog *inprog = inprog_create(pnd);
+//            pthread_mutex_t *inprog_lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+//            pthread_mutex_init(inprog_lock, NULL);
+//            // add node to linked list with this Inprog
+//            inprog_tracker_ll_add(&inprog_tracker_head, inprog, inprog_lock);
+//            pthread_mutex_unlock(&inprog_tracker_lock);
+//
+//            // wait until complete -- something better than this?
+//            while(!inprog->complete) {};
+//
+//            unsigned long long filesize = 0;
+//            pthread_mutex_lock(&inprog_tracker_lock);
+//            // This isn't correct, needs to search outer ll and ret value as method, but haven't done yet so this is idea:
+//            for(int i = 0; i < nrmachines; i++) {
+//                // for now append files, need to realloc a buf and strcat with total length (not here but as e.g)
+//                filesize += inprog_tracker_head->inprog->req_ll_head[i].req->buflen;
+//            }
+//            // delete inprog from list
+//            inprog_tracker_ll_remove(&inprog_tracker_head, *inprog);
+//            pthread_mutex_unlock(&inprog_tracker_lock);
+//            stbuf->st_size = filesize;
+            stbuf->st_size = 1064;
         }
     }
     return 0;;
@@ -123,6 +124,7 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
 static int procsys_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                            off_t offset, struct fuse_file_info *fi,
                            enum fuse_readdir_flags flags) {
+    printf("readdir\n");
 
     filler( buf, ".", NULL, 0, 0); // Current Directory
     filler( buf, "..", NULL, 0, 0); // Parent Directory
@@ -137,13 +139,14 @@ static int procsys_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
                         struct fuse_file_info *fi) {
-//    lprintf("\n\nreading file: %s\noffset: %d\nsize: %lu\n", path, offset, size);
+    printf("\n\nreading file: %s\noffset: %ld\nsize: %lu\n", path, offset, size);
 
     if ( strcmp( path, "/dev" ) == 0 ) {
         pthread_mutex_lock(&inprog_tracker_lock);
         // create Inprog and lock for it - Inprog now contains ll of all requests sent to other machines
         Inprog *inprog = inprog_create(pnd);
         pthread_mutex_t *inprog_lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+        if(!inprog_lock){goto malloc;};
         pthread_mutex_init(inprog_lock, NULL);
         // add node to linked list with this Inprog
         inprog_tracker_ll_add(&inprog_tracker_head, inprog, inprog_lock);
@@ -154,6 +157,7 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
 
         size_t buflen = inprog_tracker_head->inprog->req_ll_head[0].req->buflen;
         char *filebuf = malloc(sizeof(buflen));
+        if(!filebuf){goto malloc;};
         memcpy( filebuf, inprog_tracker_head->inprog->req_ll_head[0].req->buf, buflen );
         pthread_mutex_lock(&inprog_tracker_lock);
         // delete inprog from list
@@ -172,9 +176,15 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
 //        return size;
 
         memcpy(buf, filebuf + offset, buflen);
-        return strlen( filebuf ) - offset;
+        size_t sizee = strlen(filebuf) - offset;
+        return sizee;
     }
     return -ENOENT;
+
+    malloc:
+        perror("malloc");
+        exit(EXIT_FAILURE);
+
 }
 
 static int procsys_access(const char *path, int mask) {

@@ -26,14 +26,19 @@
 #include "ds_new.h"
 
 char tb[26];
-//int nrmachines;
-//long long a_counter;
-//Address host_addr;
-//Address *connected_clients;
-//Inprog_tracker_node *inprog_tracker_head;
-//pthread_mutex_t connected_clients_lock = PTHREAD_MUTEX_INITIALIZER;;
-//pthread_mutex_t inprog_tracker_lock = PTHREAD_MUTEX_INITIALIZER;;
-//pthread_mutex_t a_counter_lock = PTHREAD_MUTEX_INITIALIZER;
+
+void malloc_error(void) {
+    perror("malloc");
+    exit(EXIT_FAILURE);
+}
+void realloc_error(void) {
+    perror("realloc");
+    exit(EXIT_FAILURE);
+}
+void calloc_error(void) {
+    perror("calloc");
+    exit(EXIT_FAILURE);
+}
 
 void get_time(char *buf) {
 //    get_time(tb);
@@ -70,7 +75,6 @@ void lprintf(const char *fmt, ...) {
     const char *homedir = pw->pw_dir;
     char logfile[32] = {0};
     snprintf(logfile, 32, "%s/procsys.log", homedir);
-    printf("logfile: %s\n\n", logfile);
     fp = fopen(logfile, "a+");
     if(!fp) {
         perror("fopen");
@@ -423,6 +427,7 @@ char *create_message(Address host_addr, Request *req, int headerlen, int flag) {
     // add total
     size_t stlen = total_size + strlen(size) + 2; // for term char and delim
     char *message = malloc(stlen);
+    if(!message){malloc_error();};
     if(flag == FCNT) {
         snprintf(message, stlen, "%zu-%s%s",
                  total_size,
@@ -474,8 +479,8 @@ int extract_header(char **bufptr, int *char_count, Request *req, Address host_ad
     fetch_upto_delim(bufptr, hostIP, char_count);
     fetch_upto_delim(bufptr, hostPort, char_count);
 
-//    lprintf("senderIP: %s\nsenderPort: %s\nhostIP: %s\nhostPort: %s\naa_counter: %s\npath: %s\n",
-//            senderIP, senderPort, hostIP, hostPort, aa_counter, path);
+    printf("senderIP: %s\nsenderPort: %s\nhostIP: %s\nhostPort: %s\n",
+            senderIP, senderPort, hostIP, hostPort);
     // check whether given hostIP matches actual
     if(inet_addr(hostIP) != host_addr.addr.sin_addr.s_addr ||
        htons(atoi(hostPort)) != host_addr.addr.sin_port) {
@@ -484,6 +489,7 @@ int extract_header(char **bufptr, int *char_count, Request *req, Address host_ad
     }
     fetch_upto_delim(bufptr, aa_counter, char_count);
     fetch_upto_delim(bufptr, path, char_count);
+    printf("aa_counter: %s\npath: %s\n", aa_counter, path);
 
     req->sender.addr.sin_addr.s_addr = inet_addr(senderIP);
     req->sender.addr.sin_port = htons(atoi(senderPort));
@@ -522,12 +528,14 @@ int extract_buffer(char **bufptr, int *char_count, Request *req, Address host_ad
 Request *req_create(Address sender, long long counter, char *path) {
 
     Request *req = (Request *)malloc(sizeof(Request));
+    if(!req){malloc_error();};
     memset(req, 0, sizeof(Request));
     // fill in request struct with info
     req->sender = sender;
     req->atomic_counter = counter;
     snprintf(req->path, MAXPATH, "%s", path);
     return req;
+
 }
 
 int add_inprog(Inprog *inprog, Request *req) {
@@ -543,18 +551,18 @@ int create_send_msg(Request *req) {
 
     int err = 0;
     char *message = create_message(host_addr, req, HEADER, FREQ);
-//    lprintf("FREQ Sending: %s\n", message);
+    printf("FREQ Sending: %s\n", message);
 
     if((err = send(req->sender.sock_out, message, strlen(message), 0)) <= 0) {
         if(err < 0) {
             perror("send");
         }
         get_time(tb);
-//        lprintf("[thread: %ld {%s}] write to host_client failed\n", syscall(__NR_gettid), tb);
+        printf("[thread: %ld {%s}] write to host_client failed\n", syscall(__NR_gettid), tb);
     } else {
         get_time(tb);
-//        lprintf("[thread: %ld {%s}] sent %d bytes to %s @ sock_out: %d\n", syscall(__NR_gettid),
-//               tb, err, inet_ntoa(req->sender.addr.sin_addr), req->sender.sock_out);
+        printf("[thread: %ld {%s}] sent %d bytes to %s @ sock_out: %d\n", syscall(__NR_gettid),
+               tb, err, inet_ntoa(req->sender.addr.sin_addr), req->sender.sock_out);
     }
     free(message);
     return 0;
@@ -564,6 +572,8 @@ Inprog *inprog_create(char *path) {
 
     int err = 0;
     Inprog *inprog = (Inprog *)malloc(sizeof(Inprog));
+    if(!inprog){malloc_error();};
+
     memset(inprog, 0, sizeof(Inprog));
     inprog->complete = false;
     pthread_mutex_lock(&a_counter_lock);
@@ -585,6 +595,7 @@ void *server_loop(void *arg) {
     struct server_loop_args *args = (struct server_loop_args *)arg;
     int fdcount = 0, pollcnt = -99;
     struct pollfd *pfds = malloc(sizeof(*pfds) * args->arrlen);
+    if(!pfds){malloc_error();};
     // add connected clients to the pfds set
     for(int i = 0; i < args->arrlen; i++) {
         pfds[i].fd = args->conn_clients[i].sock_in;
@@ -611,8 +622,10 @@ void *server_loop(void *arg) {
                  */
                 int counter = 0, flag = 0;
                 Request *req = (Request *)malloc(sizeof(Request));
+                if(!req){malloc_error();};
                 memset(req, 0, sizeof(Request));
                 char *buf = calloc(0, sizeof(size_t) + 1);
+                if(!buf){calloc_error();};
                 int read_bytes = recv(pfds[i].fd, buf, sizeof(size_t), 0); // assuming we read 8 bytes and not less
 //                lprintf("Received %d bytes\n", read_bytes);
                 if(read_bytes <= 0) {
@@ -624,8 +637,10 @@ void *server_loop(void *arg) {
                 int total = fetch_size(buf, &counter);
                 int char_count = total;
                 buf = realloc(buf, sizeof(char) * total + 1);
+                if(!buf){realloc_error();};
                 // save after '-' into tmp
                 char *contentbuf = malloc(sizeof(char) * total + 1);
+                if(!contentbuf){malloc_error();};
                 char *e_ptr = contentbuf;
                 strncpy(contentbuf, &buf[counter], read_bytes - counter + 1);
                 int rem_bytes = total - read_bytes + counter; // already read 8 bytes, but size not included in total
@@ -652,6 +667,7 @@ void *server_loop(void *arg) {
                         }
                         size = procsizefd(fd); // individually count chars in proc file - bottleneck for large fs
                         char *procbuf = malloc(sizeof(char) * size);
+                        if(!procbuf){malloc_error();};
 //                        lprintf("procsize: %d\n", size);
 
                         res = pread(fd, procbuf, size, offset);
@@ -661,6 +677,7 @@ void *server_loop(void *arg) {
                         }
                         req->buflen = size;
                         req = realloc(req, sizeof(Request) + req->buflen); // flexible array member use
+                        if(!req){realloc_error();};
                         memset(req->buf, 0, sizeof(req->buflen));
                         snprintf(req->buf, req->buflen, "%s", procbuf);
                         free(procbuf);
@@ -690,6 +707,7 @@ void *server_loop(void *arg) {
 //                        lprintf("File content received\n");
                         req->buflen = char_count + 1; // char count includes 0 index so must add 1
                         req = realloc(req, sizeof(Request) + req->buflen);
+                        if(!req){realloc_error();};
                         memset(req->buf, 0, req->buflen);
                         // buffer, no delim so must just go on rest of size - done in switch
                         while(char_count >= 0) {
