@@ -601,7 +601,7 @@ void *server_loop(void *arg) {
                 int read_bytes = recv(pfds[i].fd, buf, sizeof(size_t), 0); // assuming we read 8 bytes and not less
 //                lprintf("Received %d bytes\n", read_bytes);
                 if(read_bytes <= 0) {
-                    printf("[thread: %ld ] disconnection, exiting..\n", syscall(__NR_gettid), tb);
+                    printf("[thread: %ld ] disconnection, exiting..\n", syscall(__NR_gettid));
                     exit(EXIT_SUCCESS);
                 }
                 // break down first 8 bytes (size_t), collecting size and whatever is left -----
@@ -651,7 +651,7 @@ void *server_loop(void *arg) {
                         memset(req->buf, 0, sizeof(req->buflen));
                         snprintf(req->buf, req->buflen, "%s", procbuf);
                         printf("\n\nProcbuf: %p\n\n", (void*)&procbuf);
-                        free(procbuf);
+//                        free(procbuf); // -- culprit to seg fault
                         // send the req back to the sender (should use new create_and_send_msg method)
                         char *message = create_message(args->host_addr, req, HEADER, FCNT);
                         printf("FCNT Sending: %s\n", message);
@@ -696,8 +696,8 @@ void *server_loop(void *arg) {
                         break;
                 }
                 free(req);
-                free(buf);
-//                free(contentbuf); -- this is the culprit to the heap errors, fix/get help
+//                free(buf); // -- culprit to seg fault
+                free(contentbuf);
             }
         } // END of poll loop
     } // END of inf for loop
