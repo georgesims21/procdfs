@@ -453,8 +453,8 @@ int extract_header(char **bufptr, int *char_count, Request *req, Address host_ad
     fetch_upto_delim(bufptr, hostIP, char_count);
     fetch_upto_delim(bufptr, hostPort, char_count);
 
-    printf("senderIP: %s\nsenderPort: %s\nhostIP: %s\nhostPort: %s\n",
-            senderIP, senderPort, hostIP, hostPort);
+//    printf("senderIP: %s\nsenderPort: %s\nhostIP: %s\nhostPort: %s\n",
+//            senderIP, senderPort, hostIP, hostPort);
     // check whether given hostIP matches actual
     if(inet_addr(hostIP) != host_addr.addr.sin_addr.s_addr ||
        htons(atoi(hostPort)) != host_addr.addr.sin_port) {
@@ -463,7 +463,7 @@ int extract_header(char **bufptr, int *char_count, Request *req, Address host_ad
     }
     fetch_upto_delim(bufptr, aa_counter, char_count);
     fetch_upto_delim(bufptr, path, char_count);
-    printf("aa_counter: %s\npath: %s\n", aa_counter, path);
+//    printf("aa_counter: %s\npath: %s\n", aa_counter, path);
 
     req->sender.addr.sin_addr.s_addr = inet_addr(senderIP);
     req->sender.addr.sin_port = htons(atoi(senderPort));
@@ -525,7 +525,7 @@ int create_send_msg(Request *req, int flag) {
 
     int err = 0;
     char *message = create_message(host_addr, req, HEADER, flag);
-    printf("FREQ Sending: %s\n", message);
+//    printf("FREQ Sending: %s\n", message);
 
     if((err = send(req->sender.sock_out, message, strlen(message), 0)) <= 0) {
         if(err < 0) {
@@ -533,8 +533,8 @@ int create_send_msg(Request *req, int flag) {
         }
         printf("[thread: %ld ] write to host_client failed\n", syscall(__NR_gettid));
     } else {
-        printf("[thread: %ld ] sent %d bytes to %s @ sock_out: %d\n", syscall(__NR_gettid),
-               err, inet_ntoa(req->sender.addr.sin_addr), req->sender.sock_out);
+//        printf("[thread: %ld ] sent %d bytes to %s @ sock_out: %d\n", syscall(__NR_gettid),
+//               err, inet_ntoa(req->sender.addr.sin_addr), req->sender.sock_out);
     }
     free(message);
     return 0;
@@ -628,7 +628,7 @@ void *server_loop(void *arg) {
                                args->conn_clients_lock, &flag, args->arrlen);
                 switch(flag) {
                     case FREQ: { // 1: other machine requesting file content
-                        printf("File request received\n");
+//                        printf("File request received\n");
                         int fd = -1, res = 0, offset = 0, size = 0, err = 0;
                         fd = openat(AT_FDCWD, req->path, O_RDONLY);
                         if (fd == -1) {
@@ -650,19 +650,19 @@ void *server_loop(void *arg) {
                         if(!req){realloc_error();};
                         memset(req->buf, 0, sizeof(req->buflen));
                         snprintf(req->buf, req->buflen, "%s", procbuf);
-                        printf("\n\nProcbuf: %p\n\n", (void*)&procbuf);
+//                        printf("\n\nProcbuf: %p\n\n", (void*)&procbuf);
 //                        free(procbuf); // -- culprit to seg fault
                         // send the req back to the sender (should use new create_and_send_msg method)
                         char *message = create_message(args->host_addr, req, HEADER, FCNT);
-                        printf("FCNT Sending: %s\n", message);
+//                        printf("FCNT Sending: %s\n", message);
                         if((err = send(req->sender.sock_out, message, strlen(message) + 1, 0)) <= 0) {
                             if(err < 0) {
                                 perror("send");
                             }
                             printf("[thread: %ld] write to host_client failed\n", syscall(__NR_gettid));
                         } else {
-                            printf("[thread: %ld] sent %d bytes to %s @ sock_out: %d\n", syscall(__NR_gettid),
-                                   err, inet_ntoa(req->sender.addr.sin_addr), req->sender.sock_out);
+//                            printf("[thread: %ld] sent %d bytes to %s @ sock_out: %d\n", syscall(__NR_gettid),
+//                                   err, inet_ntoa(req->sender.addr.sin_addr), req->sender.sock_out);
                         }
                         free(message);
                         break;
@@ -673,7 +673,7 @@ void *server_loop(void *arg) {
                          * buflen shouldn't + 1 when concatting them, n machines would lead to n - 1
                          bytes too many read when the filesystem has to deal with them
                      */
-                        printf("File content received\n");
+//                        printf("File content received\n");
                         req->buflen = char_count + 1; // char count includes 0 index so must add 1
                         req = realloc(req, sizeof(Request) + req->buflen);
                         if(!req){realloc_error();};

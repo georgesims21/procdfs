@@ -146,6 +146,60 @@ int request_ll_complete(Request_tracker_node **head) {
     return count;
 }
 
+int request_ll_countbuflen(Request_tracker_node **head) {
+
+    Request_tracker_node *reqptr = *head;
+    Request_tracker_node *next;
+    int count = 0;
+    if(reqptr == NULL) {
+        printf("The list is empty!\n");
+        return 0;
+    }
+    while(reqptr != NULL) {
+        if(reqptr->req != NULL) {
+            if(reqptr->req->complete) {
+                count += reqptr->req->buflen;
+            } else {
+                printf("Request not complete, exiting...\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+        next = reqptr->next;
+        reqptr = next;
+    }
+    return count;
+}
+
+char *request_ll_catbuf(Request_tracker_node **head) {
+    // doesn't check filebuf for non-NULL etc
+
+    Request_tracker_node *reqptr = *head;
+    Request_tracker_node *next;
+    size_t count = 0, old_count = 0;
+    char *filebuf = NULL;
+    if(reqptr == NULL) {
+        printf("The list is empty!\n");
+        exit(EXIT_FAILURE);
+    }
+    while(reqptr != NULL) {
+        if(reqptr->req != NULL) {
+            if(reqptr->req->complete) {
+                old_count = count;
+                count += reqptr->req->buflen;
+                filebuf = realloc(filebuf, count);
+                memset(&filebuf[old_count], 0, reqptr->req->buflen);
+                strncat(filebuf, reqptr->req->buf, reqptr->req->buflen);
+            } else {
+                printf("Request not complete, exiting...\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+        next = reqptr->next;
+        reqptr = next;
+    }
+    return filebuf;
+}
+
 int inprog_add_buf(Request *req, Inprog *inprog, pthread_mutex_t *inprog_lock) {
 
     Request_tracker_node *rtn;

@@ -104,12 +104,9 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
             // wait until complete -- something better than this?
             while(!inprog->complete) {};
 
-            size_t buflen = 0;
+            size_t buflen = request_ll_countbuflen(&inprog->req_ll_head);
             Inprog_tracker_node *inptn = inprog_tracker_ll_fetch_node(&inprog_tracker_head, *inprog);
-            for(int i = 0; i < inptn->inprog->messages_sent; i++) {
-                buflen += inptn->inprog->req_ll_head[i].req->buflen;
-            }
-            inprog_tracker_ll_print(&inprog_tracker_head);
+//            inprog_tracker_ll_print(&inprog_tracker_head);
             pthread_mutex_lock(&inprog_tracker_lock);
             // delete inprog from list
             inprog_tracker_ll_remove(&inprog_tracker_head, *inprog);
@@ -153,15 +150,11 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
         // wait until complete -- something better than this?
         while(!inprog->complete) {};
 
-        char *filebuf = NULL;
-        size_t buflen = 0;
         Inprog_tracker_node *inptn = inprog_tracker_ll_fetch_node(&inprog_tracker_head, *inprog);
-        for(int i = 0; i < inptn->inprog->messages_sent; i++) {
-            buflen += inptn->inprog->req_ll_head[i].req->buflen;
-            filebuf = realloc(filebuf, buflen);
-            strncat(filebuf, inptn->inprog->req_ll_head[i].req->buf, buflen);
-        }
-        inprog_tracker_ll_print(&inprog_tracker_head);
+
+        char *filebuf = request_ll_catbuf(&inprog->req_ll_head);
+        size_t buflen = strlen(filebuf);
+//        inprog_tracker_ll_print(&inprog_tracker_head);
         pthread_mutex_lock(&inprog_tracker_lock);
         // delete inprog from list
         inprog_tracker_ll_remove(&inprog_tracker_head, *inprog);

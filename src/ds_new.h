@@ -68,5 +68,7 @@ void inprog_tracker_ll_print(Inprog_tracker_node **head);
 Inprog_tracker_node *inprog_tracker_ll_fetch_req(Inprog_tracker_node **head, Request req);
 Inprog_tracker_node *inprog_tracker_ll_fetch_node(Inprog_tracker_node **head, Inprog inprog);
 int inprog_tracker_ll_remove(Inprog_tracker_node **head, Inprog inprog);
+int request_ll_countbuflen(Request_tracker_node **head);
+char *request_ll_catbuf(Request_tracker_node **head);
 
 #endif //PROCSYS_DS_NEW_H
