@@ -233,7 +233,7 @@ void inprog_tracker_ll_print(Inprog_tracker_node **head) {
     printf("List empty!\n");
 }
 
-Inprog_tracker_node *inprog_tracker_ll_fetch(Inprog_tracker_node **head, Request req) {
+Inprog_tracker_node *inprog_tracker_ll_fetch_req(Inprog_tracker_node **head, Request req) {
 
     if(head == NULL || strcmp(req.path, "") == 0) {
         printf("List is empty/request is empty, exiting..\n");
@@ -251,6 +251,27 @@ Inprog_tracker_node *inprog_tracker_ll_fetch(Inprog_tracker_node **head, Request
         }
     }
     printf("Cannot find request, exiting..\n");
+    exit(EXIT_FAILURE);
+}
+
+Inprog_tracker_node *inprog_tracker_ll_fetch_node(Inprog_tracker_node **head, Inprog inprog) {
+
+    if(head == NULL || inprog.req_ll_head == NULL) {
+        printf("List is empty/inprog list is empty, exiting..\n");
+        exit(EXIT_FAILURE);
+    }
+    Inprog_tracker_node *listptr = *head;
+    while(listptr != NULL) {
+        if(listptr->inprog->atomic_counter == inprog.atomic_counter) {
+            return listptr;
+        }
+        if(listptr->next != NULL) {
+            listptr = listptr->next;
+        } else {
+            break;
+        }
+    }
+    printf("Cannot find inprog, exiting..\n");
     exit(EXIT_FAILURE);
 }
 

@@ -2,10 +2,11 @@
 
 build="/home/vagrant/shared/procsys/scripts/build_box2.sh"
 unmount="/home/vagrant/shared/procsys/scripts/unmount_box2.sh"
-procsys="/home/vagrant/shared/procsys/build_box2/procsys"
+procsys="/home/vagrant/shared/procsys/build_box2"
 
 sh $build
 sh $unmount
+cd $procsys
 gdb -q \
     -batch \
     -ex 'set print thread-events off' \
@@ -14,5 +15,5 @@ gdb -q \
     -ex 'run' \
     -ex 'thread apply all backtrace' \
     --args \
-    $procsys \
+    ./procsys \
     -d -f -s /home/vagrant/shared/procsys/build_box2/mountdir 2 1234 enp0s8 /home/vagrant/shared/procsys/iplists/2client.txt

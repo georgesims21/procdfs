@@ -142,26 +142,6 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
     printf("\n\nreading file: %s\noffset: %ld\nsize: %lu\n", path, offset, size);
 
     if ( strcmp( path, "/dev" ) == 0 ) {
-//        pthread_mutex_lock(&inprog_tracker_lock);
-//        // create Inprog and lock for it - Inprog now contains ll of all requests sent to other machines
-//        Inprog *inprog = inprog_create(pnd);
-//        pthread_mutex_t *inprog_lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
-//        pthread_mutex_init(inprog_lock, NULL);
-//        // add node to linked list with this Inprog
-//        inprog_tracker_ll_add(&inprog_tracker_head, inprog, inprog_lock);
-//        pthread_mutex_unlock(&inprog_tracker_lock);
-//
-//        // wait until complete -- something better than this?
-//        while(!inprog->complete) {};
-//
-//        size_t buflen = inprog_tracker_head->inprog->req_ll_head[0].req->buflen;
-//        char *filebuf = malloc(sizeof(buflen));
-//        memcpy( filebuf, inprog_tracker_head->inprog->req_ll_head[0].req->buf, buflen );
-//        pthread_mutex_lock(&inprog_tracker_lock);
-//        // delete inprog from list
-//        inprog_tracker_ll_remove(&inprog_tracker_head, *inprog);
-//        pthread_mutex_unlock(&inprog_tracker_lock);
-
         pthread_mutex_lock(&inprog_tracker_lock);
         // create Inprog and lock for it - Inprog now contains ll of all requests sent to other machines
         Inprog *inprog = inprog_create(pnd);
@@ -174,9 +154,11 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
         // wait until complete -- something better than this?
         while(!inprog->complete) {};
 
-        size_t buflen = inprog_tracker_head->inprog->req_ll_head[0].req->buflen;
+        Inprog_tracker_node *inptn = inprog_tracker_ll_fetch_node(&inprog_tracker_head, *inprog);
+        size_t buflen = inptn->inprog->req_ll_head[0].req->buflen;
         char *filebuf = malloc(buflen);
-        snprintf(filebuf, buflen, "%s", inprog->req_ll_head[0].req->buf);
+        snprintf(filebuf, buflen, "%s", inptn->inprog->req_ll_head[0].req->buf);
+        inprog_tracker_ll_print(&inprog_tracker_head);
         pthread_mutex_lock(&inprog_tracker_lock);
 //        // delete inprog from list
         inprog_tracker_ll_remove(&inprog_tracker_head, *inprog);
@@ -300,14 +282,15 @@ int main(int argc, char *argv[]) {
                "[fuse flags] mountpoint total-machines port-number interface-name ipfile\n");
         exit(EXIT_FAILURE);
     }
-    printf("argc: %d\n", argc);
     argc--;
     const char *fn = argv[argc--];
     const char *infc = argv[argc--];
     long pnr = strtol(argv[argc--], NULL, 10);
     long nrm = strtol(argv[argc], NULL, 10);
     // Check if returned error from strtol OR if the longs are too large to convert
+    int max = INT_MAX;
     if (errno != 0 || ((nrm > INT_MAX) || (pnr > INT_MAX ))) {
+        perror("error:");
         printf("%s argument too large!\n", (nrm > INT_MAX) ? "first" : "second");
         exit(EXIT_FAILURE);
     }
@@ -358,7 +341,7 @@ int main(int argc, char *argv[]) {
     pthread_t sla_thread;
     pthread_create(&sla_thread, NULL, server_loop, &sla);
 
-//    lprintf("\n----- starting fuse -----\n");
+    printf("\n----- starting fuse -----\n");
 
     return fuse_main(argc, argv, &procsys_ops, NULL);
 }
