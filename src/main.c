@@ -76,7 +76,7 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
     /*
      * Files start with '/' in the path
      */
-//    lprintf("getattr called on : %s\n", path);
+    printf("getattr called on : %s\n", path);
 
     stbuf->st_gid = getgid();
     stbuf->st_uid = getuid();
@@ -94,7 +94,7 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
         if(strcmp(path, "/dev") == 0) {
             pthread_mutex_lock(&inprog_tracker_lock);
             // create Inprog and lock for it - Inprog now contains ll of all requests sent to other machines
-            Inprog *inprog = inprog_create(pnd);
+            Inprog *inprog = inprog_create(pnd); // use path with addproc() here to be generic
             pthread_mutex_t *inprog_lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
             pthread_mutex_init(inprog_lock, NULL);
             // add node to linked list with this Inprog
@@ -104,17 +104,14 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
             // wait until complete -- something better than this?
             while(!inprog->complete) {};
 
-            unsigned long long filesize = 0;
+            size_t buflen = request_ll_countbuflen(&inprog->req_ll_head);
+            Inprog_tracker_node *inptn = inprog_tracker_ll_fetch_node(&inprog_tracker_head, *inprog);
+//            inprog_tracker_ll_print(&inprog_tracker_head);
             pthread_mutex_lock(&inprog_tracker_lock);
-            // This isn't correct, needs to search outer ll and ret value as method, but haven't done yet so this is idea:
-            for(int i = 0; i < nrmachines; i++) {
-                // for now append files, need to realloc a buf and strcat with total length (not here but as e.g)
-                filesize += inprog_tracker_head->inprog->req_ll_head[i].req->buflen;
-            }
             // delete inprog from list
             inprog_tracker_ll_remove(&inprog_tracker_head, *inprog);
             pthread_mutex_unlock(&inprog_tracker_lock);
-            stbuf->st_size = filesize;
+            stbuf->st_size = buflen;
         }
     }
     return 0;;
@@ -123,6 +120,7 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
 static int procsys_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                            off_t offset, struct fuse_file_info *fi,
                            enum fuse_readdir_flags flags) {
+    printf("readdir\n");
 
     filler( buf, ".", NULL, 0, 0); // Current Directory
     filler( buf, "..", NULL, 0, 0); // Parent Directory
@@ -137,12 +135,12 @@ static int procsys_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
                         struct fuse_file_info *fi) {
-//    lprintf("\n\nreading file: %s\noffset: %d\nsize: %lu\n", path, offset, size);
+    printf("\n\nreading file: %s\noffset: %ld\nsize: %lu\n", path, offset, size);
 
     if ( strcmp( path, "/dev" ) == 0 ) {
         pthread_mutex_lock(&inprog_tracker_lock);
         // create Inprog and lock for it - Inprog now contains ll of all requests sent to other machines
-        Inprog *inprog = inprog_create(pnd);
+        Inprog *inprog = inprog_create(pnd); // use path with addproc() here to be generic
         pthread_mutex_t *inprog_lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
         pthread_mutex_init(inprog_lock, NULL);
         // add node to linked list with this Inprog
@@ -152,27 +150,29 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
         // wait until complete -- something better than this?
         while(!inprog->complete) {};
 
-        size_t buflen = inprog_tracker_head->inprog->req_ll_head[0].req->buflen;
-        char *filebuf = malloc(sizeof(buflen));
-        memcpy( filebuf, inprog_tracker_head->inprog->req_ll_head[0].req->buf, buflen );
+        Inprog_tracker_node *inptn = inprog_tracker_ll_fetch_node(&inprog_tracker_head, *inprog);
+
+        char *filebuf = request_ll_catbuf(&inprog->req_ll_head);
+        size_t buflen = strlen(filebuf);
+//        inprog_tracker_ll_print(&inprog_tracker_head);
         pthread_mutex_lock(&inprog_tracker_lock);
         // delete inprog from list
         inprog_tracker_ll_remove(&inprog_tracker_head, *inprog);
         pthread_mutex_unlock(&inprog_tracker_lock);
-//        if (offset >= buflen) {
-//            return 0;
-//        }
-//
-//        if (offset + size > buflen) {
-//            memcpy(buf, filebuf + offset, buflen - offset);
-//            return buflen - offset;
-//        }
-//
-//        memcpy(buf, filebuf + offset, size);
-//        return size;
+        if (offset >= buflen) {
+            free(filebuf);
+            return 0;
+        }
 
-        memcpy(buf, filebuf + offset, buflen);
-        return strlen( filebuf ) - offset;
+        if (offset + size > buflen) {
+            memcpy(buf, filebuf + offset, buflen - offset);
+            free(filebuf);
+            return buflen - offset;
+        }
+
+        memcpy(buf, filebuf + offset, size);
+        free(filebuf);
+        return size;
     }
     return -ENOENT;
 }
@@ -281,14 +281,15 @@ int main(int argc, char *argv[]) {
                "[fuse flags] mountpoint total-machines port-number interface-name ipfile\n");
         exit(EXIT_FAILURE);
     }
-    printf("argc: %d\n", argc);
     argc--;
     const char *fn = argv[argc--];
     const char *infc = argv[argc--];
     long pnr = strtol(argv[argc--], NULL, 10);
     long nrm = strtol(argv[argc], NULL, 10);
     // Check if returned error from strtol OR if the longs are too large to convert
+    int max = INT_MAX;
     if (errno != 0 || ((nrm > INT_MAX) || (pnr > INT_MAX ))) {
+        perror("error:");
         printf("%s argument too large!\n", (nrm > INT_MAX) ? "first" : "second");
         exit(EXIT_FAILURE);
     }
@@ -339,7 +340,7 @@ int main(int argc, char *argv[]) {
     pthread_t sla_thread;
     pthread_create(&sla_thread, NULL, server_loop, &sla);
 
-//    lprintf("\n----- starting fuse -----\n");
+    printf("\n----- starting fuse -----\n");
 
     return fuse_main(argc, argv, &procsys_ops, NULL);
 }

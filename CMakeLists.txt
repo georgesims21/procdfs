@@ -11,7 +11,7 @@ add_executable(procsys
         src/ds_new.h src/ds_new.c)
 
 target_compile_definitions(${PROJECT_NAME} PUBLIC USE_FUSE3 FUSE_USE_VERSION=35)
-target_compile_options(procsys PUBLIC -Wall -Wextra -Wpedantic)
+target_compile_options(procsys PUBLIC -Wall -Wextra -Wpedantic -g)
 set(CMAKE_C_FLAGS "-D_FILE_OFFSET_BITS=64")
 
 find_package(PkgConfig REQUIRED)

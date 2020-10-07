@@ -1,11 +1,15 @@
 #include "ds_new.h"
 #include "log.h"
+#include "server_new.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <fcntl.h>
 
 int req_tracker_ll_add(Request_tracker_node **head, Request *req) {
 
@@ -146,6 +150,91 @@ int request_ll_complete(Request_tracker_node **head) {
     return count;
 }
 
+int request_ll_countbuflen(Request_tracker_node **head) {
+
+    Request_tracker_node *reqptr = *head;
+    Request_tracker_node *next;
+    int count = 0;
+    if(reqptr == NULL) {
+        printf("The list is empty!\n");
+        return 0;
+    }
+    char *path = reqptr->req->path;
+    while(reqptr != NULL) {
+        if(reqptr->req != NULL) {
+            if(reqptr->req->complete) {
+                count += reqptr->req->buflen;
+            } else {
+                printf("Request not complete, exiting...\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+        next = reqptr->next;
+        reqptr = next;
+    }
+    int fd = -1, res = 0, offset = 0, size = 0, err = 0;
+    fd = openat(AT_FDCWD, path, O_RDONLY);
+    if (fd == -1) {
+        perror("openat");
+        exit (EXIT_FAILURE);
+    }
+    count += procsizefd(fd);
+    close(fd);
+    return count;
+}
+
+char *request_ll_catbuf(Request_tracker_node **head) {
+    // doesn't check filebuf for non-NULL etc
+
+    Request_tracker_node *reqptr = *head;
+    Request_tracker_node *next;
+    size_t count = 0, old_count = 0;
+    char *filebuf = NULL;
+    if(reqptr == NULL) {
+        printf("The list is empty!\n");
+        exit(EXIT_FAILURE);
+    }
+    char *path = reqptr->req->path;
+    while(reqptr != NULL) {
+        if(reqptr->req != NULL) {
+            if(reqptr->req->complete) {
+                old_count = count;
+                count += reqptr->req->buflen;
+                filebuf = realloc(filebuf, count);
+                memset(&filebuf[old_count], 0, reqptr->req->buflen);
+                strncat(filebuf, reqptr->req->buf, reqptr->req->buflen);
+            } else {
+                printf("Request not complete, exiting...\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+        next = reqptr->next;
+        reqptr = next;
+    }
+    int fd = -1, res = 0, offset = 0, size = 0, err = 0;
+    fd = openat(AT_FDCWD, path, O_RDONLY);
+    if (fd == -1) {
+        perror("openat");
+        exit (EXIT_FAILURE);
+    }
+    size = procsizefd(fd); // individually count chars in proc file - bottleneck for large fs
+    old_count = count;
+    count += size;
+    char *procbuf = malloc(sizeof(char) * size);
+    if(!procbuf){malloc_error();};
+    res = pread(fd, procbuf, size, offset);
+    if (res == -1) {
+        perror("pread");
+        exit(EXIT_FAILURE);
+    }
+    filebuf = realloc(filebuf, count);
+    memset(&filebuf[old_count], 0, size);
+    strncat(filebuf, procbuf, size);
+    free(procbuf);
+    close(fd);
+    return filebuf;
+}
+
 int inprog_add_buf(Request *req, Inprog *inprog, pthread_mutex_t *inprog_lock) {
 
     Request_tracker_node *rtn;
@@ -233,7 +322,7 @@ void inprog_tracker_ll_print(Inprog_tracker_node **head) {
     printf("List empty!\n");
 }
 
-Inprog_tracker_node *inprog_tracker_ll_fetch(Inprog_tracker_node **head, Request req) {
+Inprog_tracker_node *inprog_tracker_ll_fetch_req(Inprog_tracker_node **head, Request req) {
 
     if(head == NULL || strcmp(req.path, "") == 0) {
         printf("List is empty/request is empty, exiting..\n");
@@ -251,6 +340,27 @@ Inprog_tracker_node *inprog_tracker_ll_fetch(Inprog_tracker_node **head, Request
         }
     }
     printf("Cannot find request, exiting..\n");
+    exit(EXIT_FAILURE);
+}
+
+Inprog_tracker_node *inprog_tracker_ll_fetch_node(Inprog_tracker_node **head, Inprog inprog) {
+
+    if(head == NULL || inprog.req_ll_head == NULL) {
+        printf("List is empty/inprog list is empty, exiting..\n");
+        exit(EXIT_FAILURE);
+    }
+    Inprog_tracker_node *listptr = *head;
+    while(listptr != NULL) {
+        if(listptr->inprog->atomic_counter == inprog.atomic_counter) {
+            return listptr;
+        }
+        if(listptr->next != NULL) {
+            listptr = listptr->next;
+        } else {
+            break;
+        }
+    }
+    printf("Cannot find inprog, exiting..\n");
     exit(EXIT_FAILURE);
 }
 
