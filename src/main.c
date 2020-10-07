@@ -144,7 +144,7 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
     if ( strcmp( path, "/dev" ) == 0 ) {
         pthread_mutex_lock(&inprog_tracker_lock);
         // create Inprog and lock for it - Inprog now contains ll of all requests sent to other machines
-        Inprog *inprog = inprog_create(pnd);
+        Inprog *inprog = inprog_create(pnd); // use path with addproc() here to be generic
         pthread_mutex_t *inprog_lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
         pthread_mutex_init(inprog_lock, NULL);
         // add node to linked list with this Inprog
@@ -154,25 +154,32 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
         // wait until complete -- something better than this?
         while(!inprog->complete) {};
 
+        char *filebuf = NULL;
+        size_t buflen = 0;
         Inprog_tracker_node *inptn = inprog_tracker_ll_fetch_node(&inprog_tracker_head, *inprog);
-        size_t buflen = inptn->inprog->req_ll_head[0].req->buflen;
-        char *filebuf = malloc(buflen);
-        snprintf(filebuf, buflen, "%s", inptn->inprog->req_ll_head[0].req->buf);
+        for(int i = 0; i < inptn->inprog->messages_sent; i++) {
+            buflen += inptn->inprog->req_ll_head[i].req->buflen;
+            filebuf = realloc(filebuf, buflen);
+            strncat(filebuf, inptn->inprog->req_ll_head[i].req->buf, buflen);
+        }
         inprog_tracker_ll_print(&inprog_tracker_head);
         pthread_mutex_lock(&inprog_tracker_lock);
-//        // delete inprog from list
+        // delete inprog from list
         inprog_tracker_ll_remove(&inprog_tracker_head, *inprog);
         pthread_mutex_unlock(&inprog_tracker_lock);
         if (offset >= buflen) {
+            free(filebuf);
             return 0;
         }
 
         if (offset + size > buflen) {
             memcpy(buf, filebuf + offset, buflen - offset);
+            free(filebuf);
             return buflen - offset;
         }
 
         memcpy(buf, filebuf + offset, size);
+        free(filebuf);
         return size;
     }
     return -ENOENT;
