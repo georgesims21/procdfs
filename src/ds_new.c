@@ -1,11 +1,15 @@
 #include "ds_new.h"
 #include "log.h"
+#include "server_new.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <fcntl.h>
 
 int req_tracker_ll_add(Request_tracker_node **head, Request *req) {
 
@@ -155,6 +159,7 @@ int request_ll_countbuflen(Request_tracker_node **head) {
         printf("The list is empty!\n");
         return 0;
     }
+    char *path = reqptr->req->path;
     while(reqptr != NULL) {
         if(reqptr->req != NULL) {
             if(reqptr->req->complete) {
@@ -167,6 +172,14 @@ int request_ll_countbuflen(Request_tracker_node **head) {
         next = reqptr->next;
         reqptr = next;
     }
+    int fd = -1, res = 0, offset = 0, size = 0, err = 0;
+    fd = openat(AT_FDCWD, path, O_RDONLY);
+    if (fd == -1) {
+        perror("openat");
+        exit (EXIT_FAILURE);
+    }
+    count += procsizefd(fd);
+    close(fd);
     return count;
 }
 
@@ -181,6 +194,7 @@ char *request_ll_catbuf(Request_tracker_node **head) {
         printf("The list is empty!\n");
         exit(EXIT_FAILURE);
     }
+    char *path = reqptr->req->path;
     while(reqptr != NULL) {
         if(reqptr->req != NULL) {
             if(reqptr->req->complete) {
@@ -197,6 +211,27 @@ char *request_ll_catbuf(Request_tracker_node **head) {
         next = reqptr->next;
         reqptr = next;
     }
+    int fd = -1, res = 0, offset = 0, size = 0, err = 0;
+    fd = openat(AT_FDCWD, path, O_RDONLY);
+    if (fd == -1) {
+        perror("openat");
+        exit (EXIT_FAILURE);
+    }
+    size = procsizefd(fd); // individually count chars in proc file - bottleneck for large fs
+    old_count = count;
+    count += size;
+    char *procbuf = malloc(sizeof(char) * size);
+    if(!procbuf){malloc_error();};
+    res = pread(fd, procbuf, size, offset);
+    if (res == -1) {
+        perror("pread");
+        exit(EXIT_FAILURE);
+    }
+    filebuf = realloc(filebuf, count);
+    memset(&filebuf[old_count], 0, size);
+    strncat(filebuf, procbuf, size);
+    free(procbuf);
+    close(fd);
     return filebuf;
 }
 

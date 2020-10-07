@@ -113,5 +113,9 @@ static void paccept(Address host_addr, Address *client_addr);
 static int search_IPs(in_addr_t conn, const char *filename);
 char *create_message(Address host_addr, Request *req, int headerlen, int flag);
 Inprog *inprog_create(char *path);
+void malloc_error(void);
+void realloc_error(void);
+void calloc_error(void);
+int procsizefd(int fd);
 
 #endif //PROCSYS_SERVER_NEW_H
