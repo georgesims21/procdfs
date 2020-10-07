@@ -92,30 +92,29 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
         /* Important we lock here, as the server thread will try access ll once
          * messages are received from sender machines, if this is slow could cause race conditions */
         if(strcmp(path, "/dev") == 0) {
-//            pthread_mutex_lock(&inprog_tracker_lock);
-//            // create Inprog and lock for it - Inprog now contains ll of all requests sent to other machines
-//            Inprog *inprog = inprog_create(pnd);
-//            pthread_mutex_t *inprog_lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
-//            pthread_mutex_init(inprog_lock, NULL);
-//            // add node to linked list with this Inprog
-//            inprog_tracker_ll_add(&inprog_tracker_head, inprog, inprog_lock);
-//            pthread_mutex_unlock(&inprog_tracker_lock);
-//
-//            // wait until complete -- something better than this?
-//            while(!inprog->complete) {};
-//
-//            unsigned long long filesize = 0;
-//            pthread_mutex_lock(&inprog_tracker_lock);
-//            // This isn't correct, needs to search outer ll and ret value as method, but haven't done yet so this is idea:
-//            for(int i = 0; i < nrmachines; i++) {
-//                // for now append files, need to realloc a buf and strcat with total length (not here but as e.g)
-//                filesize += inprog_tracker_head->inprog->req_ll_head[i].req->buflen;
-//            }
-//            // delete inprog from list
-//            inprog_tracker_ll_remove(&inprog_tracker_head, *inprog);
-//            pthread_mutex_unlock(&inprog_tracker_lock);
-//            stbuf->st_size = filesize;
-            stbuf->st_size = 1064;
+            pthread_mutex_lock(&inprog_tracker_lock);
+            // create Inprog and lock for it - Inprog now contains ll of all requests sent to other machines
+            Inprog *inprog = inprog_create(pnd); // use path with addproc() here to be generic
+            pthread_mutex_t *inprog_lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+            pthread_mutex_init(inprog_lock, NULL);
+            // add node to linked list with this Inprog
+            inprog_tracker_ll_add(&inprog_tracker_head, inprog, inprog_lock);
+            pthread_mutex_unlock(&inprog_tracker_lock);
+
+            // wait until complete -- something better than this?
+            while(!inprog->complete) {};
+
+            size_t buflen = 0;
+            Inprog_tracker_node *inptn = inprog_tracker_ll_fetch_node(&inprog_tracker_head, *inprog);
+            for(int i = 0; i < inptn->inprog->messages_sent; i++) {
+                buflen += inptn->inprog->req_ll_head[i].req->buflen;
+            }
+            inprog_tracker_ll_print(&inprog_tracker_head);
+            pthread_mutex_lock(&inprog_tracker_lock);
+            // delete inprog from list
+            inprog_tracker_ll_remove(&inprog_tracker_head, *inprog);
+            pthread_mutex_unlock(&inprog_tracker_lock);
+            stbuf->st_size = buflen;
         }
     }
     return 0;;
