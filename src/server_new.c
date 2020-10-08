@@ -38,6 +38,15 @@ void calloc_error(void) {
     exit(EXIT_FAILURE);
 }
 
+void final_path(const char *path, char *buf) {
+
+    size_t len = strlen("/proc") + strlen(path) + 1;
+    char *tmp = malloc(sizeof(char) * len);
+    snprintf(tmp, len, "%s%s", "/proc", path);
+    memcpy(buf, tmp, len);
+    free(tmp);
+}
+
 void lprintf(const char *fmt, ...) {
 //    https://stackoverflow.com/questions/7031116/how-to-create-function-like-printf-variable-argument
     va_list arg;
