@@ -510,7 +510,7 @@ int extract_buffer(char **bufptr, int *char_count, Request *req, Address host_ad
     return 0;
 }
 
-Request *req_create(Address sender, long long counter, char *path) {
+Request *req_create(Address sender, long long counter, const char *path) {
 
     Request *req = (Request *)malloc(sizeof(Request));
     if(!req){malloc_error();};
@@ -551,7 +551,7 @@ int create_send_msg(Request *req, int flag) {
     return 0;
 }
 
-Inprog *inprog_create(char *path) {
+Inprog *inprog_create(const char *path) {
 
     Inprog *inprog = (Inprog *)malloc(sizeof(Inprog));
     if(!inprog){malloc_error();};
@@ -577,6 +577,24 @@ Inprog *inprog_create(char *path) {
         req_tracker_ll_print(&inprog->req_ll_head);
         create_send_msg(req, FREQ);
     } // END of write for loop
+    return inprog;
+}
+
+Inprog *file_request(const char *path) {
+
+    // create Inprog and lock for it - Inprog now contains ll of all requests sent to other machines
+    pthread_mutex_lock(&inprog_tracker_lock);
+    Inprog *inprog = inprog_create(path);
+    // add node to linked list with this Inprog
+    inprog_tracker_ll_add(&inprog_tracker_head, inprog);
+    pthread_mutex_unlock(&inprog_tracker_lock);
+
+    pthread_mutex_lock(inprog->complete_lock);
+    while(!inprog->complete) {
+        pthread_cond_wait(inprog->complete_cond, inprog->complete_lock);
+    }
+    pthread_mutex_unlock(inprog->complete_lock);
+
     return inprog;
 }
 

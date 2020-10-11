@@ -260,11 +260,6 @@ int inprog_add_buf(Request *req, Inprog *inprog, pthread_mutex_t *inprog_lock) {
         // check if all requests (inc. this one) have been received
         pthread_mutex_lock(inprog->complete_lock);
         if(request_ll_complete(&inprog->req_ll_head) == inprog->messages_sent) {
-            /*
-             Previously (without outer locks):
-                inprog->complete = true;
-                printf("All messages received!\n");
-             */
             inprog->complete = true;
             pthread_cond_broadcast(inprog->complete_cond);
             printf("All messages received!\n");

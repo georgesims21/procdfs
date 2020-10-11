@@ -105,11 +105,12 @@ struct new_connection_args {
     const char *filename;
 };
 char *create_message(Address host_addr, Request *req, int headerlen, int flag);
-Inprog *inprog_create(char *path);
+Inprog *inprog_create(const char *path);
 void malloc_error(void);
 void realloc_error(void);
 void calloc_error(void);
 int procsizefd(int fd);
 void final_path(const char *path, char *buf);
+Inprog *file_request(const char *path);
 
 #endif //PROCSYS_SERVER_NEW_H
