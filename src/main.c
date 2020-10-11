@@ -47,8 +47,8 @@ long long a_counter;
 Address host_addr;
 Address *connected_clients;
 Inprog_tracker_node *inprog_tracker_head;
-pthread_mutex_t connected_clients_lock = PTHREAD_MUTEX_INITIALIZER;;
-pthread_mutex_t inprog_tracker_lock = PTHREAD_MUTEX_INITIALIZER;;
+pthread_mutex_t connected_clients_lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t inprog_tracker_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t a_counter_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static void *procsys_init(struct fuse_conn_info *conn,
@@ -76,6 +76,7 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
     /*
      * Files start with '/' in the path
      */
+    (void)fi;
 
     stbuf->st_gid = getgid();
     stbuf->st_uid = getuid();
@@ -112,7 +113,7 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
                 while(!inprog->complete) {};
 
                 size_t buflen = request_ll_countbuflen(&inprog->req_ll_head);
-                Inprog_tracker_node *inptn = inprog_tracker_ll_fetch_node(&inprog_tracker_head, *inprog);
+//                Inprog_tracker_node *inptn = inprog_tracker_ll_fetch_node(&inprog_tracker_head, *inprog);
 //            inprog_tracker_ll_print(&inprog_tracker_head);
                 pthread_mutex_lock(&inprog_tracker_lock);
                 // delete inprog from list
@@ -128,6 +129,9 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
 static int procsys_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                            off_t offset, struct fuse_file_info *fi,
                            enum fuse_readdir_flags flags) {
+    (void)offset;
+    (void)fi;
+    (void)flags;
     printf("readdir\n");
 
     filler( buf, ".", NULL, 0, 0); // Current Directory
@@ -147,6 +151,7 @@ static int procsys_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
                         struct fuse_file_info *fi) {
+    (void)fi;
     printf("\n\nreading file: %s\noffset: %ld\nsize: %lu\n", path, offset, size);
 
     for(int i = 0; i < PATHARRLEN; i++) {
@@ -166,10 +171,10 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
             // wait until complete -- something better than this?
             while(!inprog->complete) {};
 
-            Inprog_tracker_node *inptn = inprog_tracker_ll_fetch_node(&inprog_tracker_head, *inprog);
+//            Inprog_tracker_node *inptn = inprog_tracker_ll_fetch_node(&inprog_tracker_head, *inprog);
 
             char *filebuf = request_ll_catbuf(&inprog->req_ll_head);
-            size_t buflen = strlen(filebuf);
+            unsigned int buflen = strlen(filebuf);
 //        inprog_tracker_ll_print(&inprog_tracker_head);
             pthread_mutex_lock(&inprog_tracker_lock);
             // delete inprog from list
@@ -196,6 +201,8 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
 
 static int procsys_access(const char *path, int mask) {
 
+    (void)path;
+    (void)mask;
 //    int res;
 //    char fpath[MAX_PATH] = {0};
 //    final_path(path, fpath);
@@ -209,6 +216,9 @@ static int procsys_access(const char *path, int mask) {
 
 static int procsys_readlink(const char *path, char *buf, size_t size) {
 
+    (void)path;
+    (void)buf;
+    (void)size;
 //    int res;
 //    char fpath[MAX_PATH] = {0};
 //    final_path(path, fpath);
@@ -224,6 +234,8 @@ static int procsys_readlink(const char *path, char *buf, size_t size) {
 
 static int procsys_open(const char *path, struct fuse_file_info *fi) {
 
+    (void)path;
+    (void)fi;
 //    int res;
 //    char fpath[MAX_PATH] = {0};
 //    final_path(path, fpath);
@@ -236,6 +248,9 @@ static int procsys_open(const char *path, struct fuse_file_info *fi) {
 }
 
 static int procsys_statfs(const char *path, struct statvfs *stbuf) {
+
+    (void)path;
+    (void)stbuf;
 
 //    int res;
 //    char fpath[MAX_PATH] = {0};
@@ -250,6 +265,8 @@ static int procsys_statfs(const char *path, struct statvfs *stbuf) {
 
 static int procsys_release(const char *path, struct fuse_file_info *fi) {
 
+    (void)path;
+    (void)fi;
 //    (void) path;
 //    close(fi->fh);
     return 0;
@@ -257,6 +274,10 @@ static int procsys_release(const char *path, struct fuse_file_info *fi) {
 
 static off_t procsys_lseek(const char *path, off_t off, int whence, struct fuse_file_info *fi) {
 
+    (void)path;
+    (void)off;
+    (void)whence;
+    (void)fi;
 //    int fd;
 //    off_t res;
 //    char fpath[MAX_PATH] = {0};
@@ -277,6 +298,7 @@ static off_t procsys_lseek(const char *path, off_t off, int whence, struct fuse_
 //    if (fi == NULL)
 //        close(fd);
 //    return res;
+    return 0;
 }
 
 static const struct fuse_operations procsys_ops = {
@@ -304,13 +326,11 @@ int main(int argc, char *argv[]) {
     long pnr = strtol(argv[argc--], NULL, 10);
     long nrm = strtol(argv[argc], NULL, 10);
     // Check if returned error from strtol OR if the longs are too large to convert
-    int max = INT_MAX;
     if (errno != 0 || ((nrm > INT_MAX) || (pnr > INT_MAX ))) {
         perror("error:");
         printf("%s argument too large!\n", (nrm > INT_MAX) ? "first" : "second");
         exit(EXIT_FAILURE);
     }
-    int err;
     nrmachines = (int)nrm - 1; // to account for this machine (not adding to connected clients)
     int portnr = (int)pnr;
 

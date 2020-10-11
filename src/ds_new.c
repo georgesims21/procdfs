@@ -172,7 +172,7 @@ int request_ll_countbuflen(Request_tracker_node **head) {
         next = reqptr->next;
         reqptr = next;
     }
-    int fd = -1, res = 0, offset = 0, size = 0, err = 0;
+    int fd = -1;
     fd = openat(AT_FDCWD, path, O_RDONLY);
     if (fd == -1) {
         perror("openat");
@@ -185,6 +185,9 @@ int request_ll_countbuflen(Request_tracker_node **head) {
 }
 
 char *request_ll_catbuf(Request_tracker_node **head) {
+    /*
+     * https://en.wikipedia.org/wiki/Joel_Spolsky#Schlemiel_the_Painter's_algorithm
+     */
     // doesn't check filebuf for non-NULL etc
 
     Request_tracker_node *reqptr = *head;
@@ -203,6 +206,10 @@ char *request_ll_catbuf(Request_tracker_node **head) {
                 count += reqptr->req->buflen;
                 filebuf = realloc(filebuf, count);
                 memset(&filebuf[old_count], 0, reqptr->req->buflen);
+                /* TODO
+                     * be precise with strncat using size or address to avoid the
+                     painters problem/algo
+                */
                 strncat(filebuf, reqptr->req->buf, reqptr->req->buflen);
             } else {
                 printf("Request not complete, exiting...\n");
@@ -212,7 +219,7 @@ char *request_ll_catbuf(Request_tracker_node **head) {
         next = reqptr->next;
         reqptr = next;
     }
-    int fd = -1, res = 0, offset = 0, size = 0, err = 0;
+    int fd = -1, res = 0, offset = 0, size = 0;
     fd = openat(AT_FDCWD, path, O_RDONLY);
     if (fd == -1) {
         perror("openat");
@@ -369,7 +376,6 @@ Inprog_tracker_node *inprog_tracker_ll_fetch_node(Inprog_tracker_node **head, In
 int inprog_tracker_ll_remove(Inprog_tracker_node **head, Inprog inprog) {
 
     Inprog_tracker_node *reqptr = *head;
-    Inprog_tracker_node *next;
     Inprog_tracker_node *tmp;
     if(reqptr == NULL) {
         printf("The list is empty! Not freeing anything\n");

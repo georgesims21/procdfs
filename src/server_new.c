@@ -73,6 +73,38 @@ void lprintf(const char *fmt, ...) {
     fclose(fp);
 }
 
+static int fetch_IP(Address *addr, const char *interface) {
+
+    struct ifaddrs *ifaddr, *ifa;
+    int family, s;
+    char host[NI_MAXHOST];
+
+    // fetch linked list containing all interfaces on machine
+    if (getifaddrs(&ifaddr) == -1) {
+        perror("getifaddrs");
+        exit(EXIT_FAILURE);
+    }
+    // loop through the ll
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+        family = ifa->ifa_addr->sa_family;
+        if (family == AF_INET) {
+            // collect all info for interface
+            s = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in),
+                            host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+            if (s != 0) {
+                printf("getnameinfo() failed: %s\n", gai_strerror(s));
+                exit(EXIT_FAILURE);
+            }
+            // if this interface matches the specified, save this IP address
+            if(strcmp(ifa->ifa_name, interface) == 0) {
+                addr->addr.sin_addr.s_addr = inet_addr(host);
+                return 0;
+            }
+        }
+    }
+    return 1;
+}
+
 int init_server(Address *address, int queue_length, int port_number, const char *interface) {
 
     if((address->sock_in = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -98,6 +130,63 @@ int init_server(Address *address, int queue_length, int port_number, const char 
     return 0;
 }
 
+static int contained_within(Address *addr, Address lookup, int arrlen) {
+
+    Address *ptr = addr; // Address array
+    int i = 0;
+    while(i < arrlen) {
+        if(ptr->addr.sin_addr.s_addr == lookup.addr.sin_addr.s_addr) {
+            return i;
+        }
+        i++; ptr++;
+    }
+    return -1;
+}
+
+static int next_space(Address *addr, int arrlen) {
+    // assumes user has locked addr
+    int i = 0;
+    Address *ptr = addr; // Address array
+    while(i < arrlen) {
+        if(ptr->sock_in == 0 && ptr->sock_out == 0) {
+            return i;
+        }
+        i++; ptr++;
+    }
+    return -1;
+}
+
+static int pconnect(Address *addrarr, int arrlen, Address *newaddr) {
+
+    int free = 0;
+    newaddr->addr.sin_port = htons(1234); // using generic port here, find solution
+    int location = 0;
+
+    if((newaddr->sock_out = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        perror("socket\n");
+        exit(EXIT_FAILURE);
+    }
+    if(connect(newaddr->sock_out, (struct sockaddr*)&newaddr->addr, newaddr->addr_len) < 0) {
+        close(newaddr->sock_out);
+        return -1;
+    }
+    if((location = contained_within(addrarr, *newaddr, arrlen)) != -1) {
+        // if already inside it must be a response from a connected client
+        if(addrarr[location].sock_out == 0)
+            addrarr[location].sock_out = newaddr->sock_out;
+        return -1;
+    }
+    free = next_space(addrarr, arrlen);
+    if(free < 0) {
+        printf("[thread: %ld] Maximum number of machines reached (%d), not adding!\n",
+               syscall(__NR_gettid), arrlen);
+        exit(EXIT_FAILURE);
+    }
+
+    addrarr[free] = *newaddr;
+    return 0;
+}
+
 void *connect_to_file_IPs(void *arg) {
 
     struct connect_to_file_IPs_args *args = (struct connect_to_file_IPs_args *) arg;
@@ -108,12 +197,11 @@ void *connect_to_file_IPs(void *arg) {
     in_addr_t conn;
 
     FILE* file = fopen(filename, "r");
-    if((file < 0)) {
+    if(file == NULL) {
         perror("fopen");
         exit(EXIT_FAILURE);
     }
     // save all IPs from file to an Address array
-    int count = 0;
     while(fgets(line, sizeof(line), file)) {
         if(strncmp(line, "\n", 1) == 0)
             continue;
@@ -168,62 +256,6 @@ void *connect_to_file_IPs(void *arg) {
     pthread_exit(0);
 }
 
-void *accept_connection(void *arg) {
-
-    struct accept_connection_args *args = (struct accept_connection_args *)arg;
-    struct pollfd pfds;
-    int remaining_conns = args->arrlen, pollcnt = 0;
-    pfds.fd = args->host_addr.sock_in;
-    pfds.events = POLLIN;
-
-    while(remaining_conns > 0) {
-        if((pollcnt = poll(&pfds, 1, -1)) < 0) { // have 3 sec timeout if doesn't work
-            perror("poll");
-            exit(EXIT_FAILURE);
-        }
-        if(pfds.revents & POLLIN) {
-            // new connection
-            struct new_connection_args nca = {args->conn_clients, args->conn_clients_lock,
-                                              args->host_addr, args->arrlen, args->filename};
-            pthread_t nc_thread;
-            pthread_create(&nc_thread, NULL, new_connection, &nca);
-            pthread_join(nc_thread, NULL);
-            remaining_conns--; // assumes that if wasn't added correctly then exited
-        } else {
-            printf("Error on pfds poll\n");
-        }
-    }
-}
-
-static void *new_connection(void *arg) {
-
-    struct new_connection_args *args = (struct new_connection_args *) arg;
-    int loc = 0;
-    Address new_client;
-    memset(&new_client, 0, sizeof(Address));
-
-    pthread_mutex_lock(args->conn_clients_lock);
-    paccept(args->host_addr, &new_client);
-    new_client.addr.sin_port = htons(1234);
-    if((loc = contained_within(args->conn_clients, new_client, args->arrlen)) >= 0) {
-        // already in the array
-        args->conn_clients[loc].sock_in = new_client.sock_in;
-    } else {
-        // not in array, must be added
-        if(search_IPs(new_client.addr.sin_addr.s_addr, args->filename) == 0) {
-            int free = next_space(args->conn_clients, args->arrlen);
-            if(free < 0) {
-                printf("[thread: %ld ] Maximum number of machines reached (%d), exiting program..\n",
-                       syscall(__NR_gettid), args->arrlen);
-                exit(EXIT_FAILURE);
-            }
-            args->conn_clients[free] = new_client;
-        }
-    }
-    pthread_mutex_unlock(args->conn_clients_lock);
-    pthread_exit(0);
-}
-
 static void paccept(Address host_addr, Address *client_addr) {
 
     client_addr->addr_len = sizeof(client_addr->addr);
@@ -260,93 +292,60 @@ static int search_IPs(in_addr_t conn, const char *filename) {
     return -1;
 }
 
-static int fetch_IP(Address *addr, const char *interface) {
+static void *new_connection(void *arg) {
 
-    struct ifaddrs *ifaddr, *ifa;
-    int family, s;
-    char host[NI_MAXHOST];
+    struct new_connection_args *args = (struct new_connection_args *) arg;
+    int loc = 0;
+    Address new_client;
+    memset(&new_client, 0, sizeof(Address));
 
-    // fetch linked list containing all interfaces on machine
-    if (getifaddrs(&ifaddr) == -1) {
-        perror("getifaddrs");
-        exit(EXIT_FAILURE);
-    }
-    // loop through the ll
-    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
-        family = ifa->ifa_addr->sa_family;
-        if (family == AF_INET) {
-            // collect all info for interface
-            s = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in),
-                            host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
-            if (s != 0) {
-                printf("getnameinfo() failed: %s\n", gai_strerror(s));
+    pthread_mutex_lock(args->conn_clients_lock);
+    paccept(args->host_addr, &new_client);
+    new_client.addr.sin_port = htons(1234);
+    if((loc = contained_within(args->conn_clients, new_client, args->arrlen)) >= 0) {
+        // already in the array
+        args->conn_clients[loc].sock_in = new_client.sock_in;
+    } else {
+        // not in array, must be added
+        if(search_IPs(new_client.addr.sin_addr.s_addr, args->filename) == 0) {
+            int free = next_space(args->conn_clients, args->arrlen);
+            if(free < 0) {
+                printf("[thread: %ld ] Maximum number of machines reached (%d), exiting program..\n",
+                       syscall(__NR_gettid), args->arrlen);
                 exit(EXIT_FAILURE);
             }
-            // if this interface matches the specified, save this IP address
-            if(strcmp(ifa->ifa_name, interface) == 0) {
-                addr->addr.sin_addr.s_addr = inet_addr(host);
-                return 0;
-            }
+            args->conn_clients[free] = new_client;
         }
     }
-    return 1;
+    pthread_mutex_unlock(args->conn_clients_lock);
+    pthread_exit(0);
 }
 
-static int pconnect(Address *addrarr, int arrlen, Address *newaddr) {
+void *accept_connection(void *arg) {
 
-    int free = 0;
-    newaddr->addr.sin_port = htons(1234); // using generic port here, find solution
-    int location = 0;
+    struct accept_connection_args *args = (struct accept_connection_args *)arg;
+    struct pollfd pfds;
+    int remaining_conns = args->arrlen, pollcnt = 0;
+    pfds.fd = args->host_addr.sock_in;
+    pfds.events = POLLIN;
 
-    if((newaddr->sock_out = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        perror("socket\n");
-        exit(EXIT_FAILURE);
-    }
-    if(connect(newaddr->sock_out, (struct sockaddr*)&newaddr->addr, newaddr->addr_len) < 0) {
-        close(newaddr->sock_out);
-        return -1;
-    }
-    if((location = contained_within(addrarr, *newaddr, arrlen)) != -1) {
-        // if already inside it must be a response from a connected client
-        if(addrarr[location].sock_out == 0)
-            addrarr[location].sock_out = newaddr->sock_out;
-        return -1;
-    }
-    free = next_space(addrarr, arrlen);
-    if(free < 0) {
-        printf("[thread: %ld] Maximum number of machines reached (%d), not adding!\n",
-               syscall(__NR_gettid), arrlen);
-        exit(EXIT_FAILURE);
-    }
-
-    addrarr[free] = *newaddr;
-    return 0;
-}
-
-static int next_space(Address *addr, int arrlen) {
-    // assumes user has locked addr
-    int i = 0;
-    Address *ptr = addr; // Address array
-    while(i < arrlen) {
-        if(ptr->sock_in == 0 && ptr->sock_out == 0) {
-            return i;
+    while(remaining_conns > 0) {
+        if((pollcnt = poll(&pfds, 1, -1)) < 0) { // have 3 sec timeout if doesn't work
+            perror("poll");
+            exit(EXIT_FAILURE);
         }
-        i++; ptr++;
-    }
-    return -1;
-}
-
-static int contained_within(Address *addr, Address lookup, int arrlen) {
-
-    Address *ptr = addr; // Address array
-    int i = 0;
-    while(i < arrlen) {
-        if(ptr->addr.sin_addr.s_addr == lookup.addr.sin_addr.s_addr) {
-            return i;
+        if(pfds.revents & POLLIN) {
+            // new connection
+            struct new_connection_args nca = {args->conn_clients, args->conn_clients_lock,
+                                              args->host_addr, args->arrlen, args->filename};
+            pthread_t nc_thread;
+            pthread_create(&nc_thread, NULL, new_connection, &nca);
+            pthread_join(nc_thread, NULL);
+            remaining_conns--; // assumes that if wasn't added correctly then exited
+        } else {
+            printf("Error on pfds poll\n");
         }
-        i++; ptr++;
     }
-    return -1;
 }
 
 static int contained_within_ret(Address *addr, Address *lookup, int arrlen) {
@@ -387,6 +386,7 @@ int procsizefd(int fd) {
 
 char *create_message(Address host_addr, Request *req, int headerlen, int flag) {
 
+    (void)headerlen;
     char hostip[32];
     snprintf(hostip, 32, "%s", inet_ntoa(host_addr.addr.sin_addr));
     char hostpo[16];
@@ -553,7 +553,6 @@ int create_send_msg(Request *req, int flag) {
 
 Inprog *inprog_create(char *path) {
 
-    int err = 0;
     Inprog *inprog = (Inprog *)malloc(sizeof(Inprog));
     if(!inprog){malloc_error();};
 
@@ -600,14 +599,12 @@ void *server_loop(void *arg) {
                              * (extra) make into void method
                          * 2: content received
                              * (extra) make into void method
-                         * will need to read size_t + 1 eventually to account for MAX long long + '-'.. will
-                         break if this happens
                  */
                 int counter = 0, flag = 0;
                 Request *req = (Request *)malloc(sizeof(Request));
                 if(!req){malloc_error();};
                 memset(req, 0, sizeof(Request));
-                char *buf = calloc(0, sizeof(size_t) + 1);
+                char *buf = calloc(1, sizeof(size_t) + 1);
                 if(!buf){calloc_error();};
                 int read_bytes = recv(pfds[i].fd, buf, sizeof(size_t), 0); // assuming we read 8 bytes and not less
 //                lprintf("Received %d bytes\n", read_bytes);
@@ -620,9 +617,11 @@ void *server_loop(void *arg) {
                 int char_count = total;
                 buf = realloc(buf, sizeof(char) * total + 1);
                 if(!buf){realloc_error();};
+                memset(&buf[sizeof(size_t) + 1], 0, (sizeof(char) * total + 1) -(sizeof(size_t) + 1));
                 // save after '-' into tmp
-                char *contentbuf = malloc(sizeof(char) * total + 1);
-                if(!contentbuf){malloc_error();};
+                char *contentbuf = calloc(total + 1, sizeof(char));
+                if(!contentbuf){calloc_error();};
+//                memset(contentbuf, 0, sizeof(char) * total + 1);
                 char *e_ptr = contentbuf;
                 strncpy(contentbuf, &buf[counter], read_bytes - counter + 1);
                 int rem_bytes = total - read_bytes + counter; // already read 8 bytes, but size not included in total
@@ -663,7 +662,7 @@ void *server_loop(void *arg) {
                         memset(req->buf, 0, sizeof(req->buflen));
                         snprintf(req->buf, req->buflen, "%s", procbuf);
 //                        printf("\n\nProcbuf: %p\n\n", (void*)&procbuf);
-//                        free(procbuf); // -- culprit to seg fault
+                        free(procbuf); // -- culprit to seg fault
                         // send the req back to the sender (should use new create_and_send_msg method)
                         char *message = create_message(args->host_addr, req, HEADER, FCNT);
 //                        printf("FCNT Sending: %s\n", message);
@@ -708,7 +707,7 @@ void *server_loop(void *arg) {
                         break;
                 }
                 free(req);
-//                free(buf); // -- culprit to seg fault
+                free(buf); // -- culprit to seg fault
                 free(contentbuf);
             }
         } // END of poll loop
