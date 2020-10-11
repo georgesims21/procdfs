@@ -185,6 +185,9 @@ int request_ll_countbuflen(Request_tracker_node **head) {
 }
 
 char *request_ll_catbuf(Request_tracker_node **head) {
+    /*
+     * https://en.wikipedia.org/wiki/Joel_Spolsky#Schlemiel_the_Painter's_algorithm
+     */
     // doesn't check filebuf for non-NULL etc
 
     Request_tracker_node *reqptr = *head;
@@ -203,6 +206,10 @@ char *request_ll_catbuf(Request_tracker_node **head) {
                 count += reqptr->req->buflen;
                 filebuf = realloc(filebuf, count);
                 memset(&filebuf[old_count], 0, reqptr->req->buflen);
+                /* TODO
+                     * be precise with strncat using size or address to avoid the
+                     painters problem/algo
+                */
                 strncat(filebuf, reqptr->req->buf, reqptr->req->buflen);
             } else {
                 printf("Request not complete, exiting...\n");

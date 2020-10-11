@@ -607,7 +607,7 @@ void *server_loop(void *arg) {
                 Request *req = (Request *)malloc(sizeof(Request));
                 if(!req){malloc_error();};
                 memset(req, 0, sizeof(Request));
-                char *buf = calloc(0, sizeof(size_t) + 1);
+                char *buf = calloc(1, sizeof(size_t) + 1);
                 if(!buf){calloc_error();};
                 int read_bytes = recv(pfds[i].fd, buf, sizeof(size_t), 0); // assuming we read 8 bytes and not less
 //                lprintf("Received %d bytes\n", read_bytes);
@@ -620,9 +620,11 @@ void *server_loop(void *arg) {
                 int char_count = total;
                 buf = realloc(buf, sizeof(char) * total + 1);
                 if(!buf){realloc_error();};
+                memset(&buf[sizeof(size_t) + 1], 0, (sizeof(char) * total + 1) -(sizeof(size_t) + 1));
                 // save after '-' into tmp
-                char *contentbuf = malloc(sizeof(char) * total + 1);
-                if(!contentbuf){malloc_error();};
+                char *contentbuf = calloc(total + 1, sizeof(char));
+                if(!contentbuf){calloc_error();};
+//                memset(contentbuf, 0, sizeof(char) * total + 1);
                 char *e_ptr = contentbuf;
                 strncpy(contentbuf, &buf[counter], read_bytes - counter + 1);
                 int rem_bytes = total - read_bytes + counter; // already read 8 bytes, but size not included in total
@@ -663,7 +665,7 @@ void *server_loop(void *arg) {
                         memset(req->buf, 0, sizeof(req->buflen));
                         snprintf(req->buf, req->buflen, "%s", procbuf);
 //                        printf("\n\nProcbuf: %p\n\n", (void*)&procbuf);
-//                        free(procbuf); // -- culprit to seg fault
+                        free(procbuf); // -- culprit to seg fault
                         // send the req back to the sender (should use new create_and_send_msg method)
                         char *message = create_message(args->host_addr, req, HEADER, FCNT);
 //                        printf("FCNT Sending: %s\n", message);
@@ -708,7 +710,7 @@ void *server_loop(void *arg) {
                         break;
                 }
                 free(req);
-//                free(buf); // -- culprit to seg fault
+                free(buf); // -- culprit to seg fault
                 free(contentbuf);
             }
         } // END of poll loop
