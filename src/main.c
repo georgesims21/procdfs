@@ -40,6 +40,7 @@
 #include "writer.h"
 #include "ds_new.h"
 #include "server_new.h"
+#include "pathnames.h"
 
 int nrmachines;
 long long a_counter;
@@ -85,38 +86,40 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
         stbuf->st_nlink = 3; // (2+n dirs) account for . and .. https://unix.stackexchange.com/questions/101515/why-does-a-new-directory-have-a-hard-link-count-of-2-before-anything-is-added-to/101536#101536
     }
     else if(strcmp(path, "/net") == 0) {
-        stbuf->st_mode = S_IFDIR | 0444; // gives all read access no more
-        stbuf->st_nlink = 2; // (2+n dirs) account for . and .. https://unix.stackexchange.com/questions/101515/why-does-a-new-directory-have-a-hard-link-count-of-2-before-anything-is-added-to/101536#101536
+        stbuf->st_mode = S_IFDIR | 0444;
+        stbuf->st_nlink = 2;
     } else {
         char pathbuf[MAXPATH] = {0};
         final_path(path, pathbuf);
-        printf("getattr called on : %s\n", pathbuf);
+        printf("getattr called on (pathbuf): %s\n", pathbuf);
         // files
         stbuf->st_mode = S_IFREG | 0444;
         stbuf->st_nlink = 1; // only located here, nowhere else yet
         /* Important we lock here, as the server thread will try access ll once
          * messages are received from sender machines, if this is slow could cause race conditions */
-        if(strcmp(path, "/net/dev") == 0) {
-            pthread_mutex_lock(&inprog_tracker_lock);
-            // create Inprog and lock for it - Inprog now contains ll of all requests sent to other machines
-            Inprog *inprog = inprog_create(pathbuf);
-            pthread_mutex_t *inprog_lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
-            pthread_mutex_init(inprog_lock, NULL);
-            // add node to linked list with this Inprog
-            inprog_tracker_ll_add(&inprog_tracker_head, inprog, inprog_lock);
-            pthread_mutex_unlock(&inprog_tracker_lock);
+        for(int i = 0; i < PATHARRLEN; i++) {
+            if(strcmp(path, paths[i]) == 0) {
+                pthread_mutex_lock(&inprog_tracker_lock);
+                // create Inprog and lock for it - Inprog now contains ll of all requests sent to other machines
+                Inprog *inprog = inprog_create(pathbuf);
+                pthread_mutex_t *inprog_lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+                pthread_mutex_init(inprog_lock, NULL);
+                // add node to linked list with this Inprog
+                inprog_tracker_ll_add(&inprog_tracker_head, inprog, inprog_lock);
+                pthread_mutex_unlock(&inprog_tracker_lock);
 
-            // wait until complete -- something better than this?
-            while(!inprog->complete) {};
+                // wait until complete -- something better than this?
+                while(!inprog->complete) {};
 
-            size_t buflen = request_ll_countbuflen(&inprog->req_ll_head);
-            Inprog_tracker_node *inptn = inprog_tracker_ll_fetch_node(&inprog_tracker_head, *inprog);
+                size_t buflen = request_ll_countbuflen(&inprog->req_ll_head);
+                Inprog_tracker_node *inptn = inprog_tracker_ll_fetch_node(&inprog_tracker_head, *inprog);
 //            inprog_tracker_ll_print(&inprog_tracker_head);
-            pthread_mutex_lock(&inprog_tracker_lock);
-            // delete inprog from list
-            inprog_tracker_ll_remove(&inprog_tracker_head, *inprog);
-            pthread_mutex_unlock(&inprog_tracker_lock);
-            stbuf->st_size = buflen;
+                pthread_mutex_lock(&inprog_tracker_lock);
+                // delete inprog from list
+                inprog_tracker_ll_remove(&inprog_tracker_head, *inprog);
+                pthread_mutex_unlock(&inprog_tracker_lock);
+                stbuf->st_size = buflen;
+            }
         }
     }
     return 0;;
@@ -132,10 +135,12 @@ static int procsys_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
     if (strcmp(path, "/") == 0) {
         filler(buf, "net", NULL, 0, 0);
-//        filler(buf, "dev", NULL, 0, 0);
     }
     if (strcmp(path, "/net") == 0) {
-        filler(buf, "dev", NULL, 0, 0);
+        for(int i = 0; i < PATHARRLEN; i++) {
+            filler(buf, filenames[i], NULL, 0, 0);
+        }
+
     }
     return 0;
 }
@@ -144,45 +149,47 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
                         struct fuse_file_info *fi) {
     printf("\n\nreading file: %s\noffset: %ld\nsize: %lu\n", path, offset, size);
 
-    if(strcmp(path, "/net/dev") == 0) {
-        char pathbuf[MAXPATH] = {0};
-        final_path(path, pathbuf);
-        printf("getattr called on : %s\n", pathbuf);
-        pthread_mutex_lock(&inprog_tracker_lock);
-        // create Inprog and lock for it - Inprog now contains ll of all requests sent to other machines
-        Inprog *inprog = inprog_create(pathbuf);
-        pthread_mutex_t *inprog_lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
-        pthread_mutex_init(inprog_lock, NULL);
-        // add node to linked list with this Inprog
-        inprog_tracker_ll_add(&inprog_tracker_head, inprog, inprog_lock);
-        pthread_mutex_unlock(&inprog_tracker_lock);
+    for(int i = 0; i < PATHARRLEN; i++) {
+        if(strcmp(path, paths[i]) == 0) {
+            char pathbuf[MAXPATH] = {0};
+            final_path(path, pathbuf);
+            printf("getattr called on : %s\n", pathbuf);
+            pthread_mutex_lock(&inprog_tracker_lock);
+            // create Inprog and lock for it - Inprog now contains ll of all requests sent to other machines
+            Inprog *inprog = inprog_create(pathbuf);
+            pthread_mutex_t *inprog_lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+            pthread_mutex_init(inprog_lock, NULL);
+            // add node to linked list with this Inprog
+            inprog_tracker_ll_add(&inprog_tracker_head, inprog, inprog_lock);
+            pthread_mutex_unlock(&inprog_tracker_lock);
 
-        // wait until complete -- something better than this?
-        while(!inprog->complete) {};
+            // wait until complete -- something better than this?
+            while(!inprog->complete) {};
 
-        Inprog_tracker_node *inptn = inprog_tracker_ll_fetch_node(&inprog_tracker_head, *inprog);
+            Inprog_tracker_node *inptn = inprog_tracker_ll_fetch_node(&inprog_tracker_head, *inprog);
 
-        char *filebuf = request_ll_catbuf(&inprog->req_ll_head);
-        size_t buflen = strlen(filebuf);
+            char *filebuf = request_ll_catbuf(&inprog->req_ll_head);
+            size_t buflen = strlen(filebuf);
 //        inprog_tracker_ll_print(&inprog_tracker_head);
-        pthread_mutex_lock(&inprog_tracker_lock);
-        // delete inprog from list
-        inprog_tracker_ll_remove(&inprog_tracker_head, *inprog);
-        pthread_mutex_unlock(&inprog_tracker_lock);
-        if (offset >= buflen) {
-            free(filebuf);
-            return 0;
-        }
+            pthread_mutex_lock(&inprog_tracker_lock);
+            // delete inprog from list
+            inprog_tracker_ll_remove(&inprog_tracker_head, *inprog);
+            pthread_mutex_unlock(&inprog_tracker_lock);
+            if (offset >= buflen) {
+                free(filebuf);
+                return 0;
+            }
 
-        if (offset + size > buflen) {
-            memcpy(buf, filebuf + offset, buflen - offset);
-            free(filebuf);
-            return buflen - offset;
-        }
+            if (offset + size > buflen) {
+                memcpy(buf, filebuf + offset, buflen - offset);
+                free(filebuf);
+                return buflen - offset;
+            }
 
-        memcpy(buf, filebuf + offset, size);
-        free(filebuf);
-        return size;
+            memcpy(buf, filebuf + offset, size);
+            free(filebuf);
+            return size;
+        }
     }
     return -ENOENT;
 }

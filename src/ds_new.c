@@ -176,6 +176,7 @@ int request_ll_countbuflen(Request_tracker_node **head) {
     fd = openat(AT_FDCWD, path, O_RDONLY);
     if (fd == -1) {
         perror("openat");
+        printf("%s\n", path);
         exit (EXIT_FAILURE);
     }
     count += procsizefd(fd);
@@ -215,6 +216,7 @@ char *request_ll_catbuf(Request_tracker_node **head) {
     fd = openat(AT_FDCWD, path, O_RDONLY);
     if (fd == -1) {
         perror("openat");
+        printf("%s\n", path);
         exit (EXIT_FAILURE);
     }
     size = procsizefd(fd); // individually count chars in proc file - bottleneck for large fs

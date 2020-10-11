@@ -8,7 +8,8 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/CMakeModules/")
 add_executable(procsys
         src/main.c
         src/server_new.c src/server_new.h
-        src/ds_new.h src/ds_new.c)
+        src/ds_new.h src/ds_new.c
+        src/pathnames.h)
 
 target_compile_definitions(${PROJECT_NAME} PUBLIC USE_FUSE3 FUSE_USE_VERSION=35)
 target_compile_options(procsys PUBLIC -Wall -Wextra -Wpedantic -g)

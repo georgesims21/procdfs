@@ -374,9 +374,11 @@ int procsizefd(int fd) {
 
     char buf[4096];
     int count = 0;
-    if(fd < 0)
+    if(fd < 1 ) {
         // file doesn't exist
-        return -1;
+        printf("procsizefd fd < 1\n");
+        exit(EXIT_FAILURE);
+    }
     while(read(fd, buf, 1) > 0) {
         count++;
     }
@@ -642,6 +644,7 @@ void *server_loop(void *arg) {
                         fd = openat(AT_FDCWD, req->path, O_RDONLY);
                         if (fd == -1) {
                             perror("openat");
+                            printf("%s\n", req->path);
                             exit (EXIT_FAILURE);
                         }
                         size = procsizefd(fd); // individually count chars in proc file - bottleneck for large fs
