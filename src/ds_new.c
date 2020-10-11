@@ -256,11 +256,22 @@ int inprog_add_buf(Request *req, Inprog *inprog, pthread_mutex_t *inprog_lock) {
         strcpy(rtn->req->buf, req->buf);
         rtn->req->complete = true;
         req_tracker_ll_print(&inprog->req_ll_head);
+
         // check if all requests (inc. this one) have been received
+        pthread_mutex_lock(inprog->complete_lock);
         if(request_ll_complete(&inprog->req_ll_head) == inprog->messages_sent) {
+            /*
+             Previously (without outer locks):
+                inprog->complete = true;
+                printf("All messages received!\n");
+             */
             inprog->complete = true;
+            pthread_cond_broadcast(inprog->complete_cond);
             printf("All messages received!\n");
         }
+        pthread_mutex_unlock(inprog->complete_lock);
+
+
     } else {
         printf("Request not contained within the linked list, exiting...\n");
         exit(EXIT_FAILURE);
@@ -275,7 +286,7 @@ void inprog_reset(Inprog *inp) {
     memset(inp, 0, sizeof(Inprog));
 }
 
-int inprog_tracker_ll_add(Inprog_tracker_node **head, Inprog *inprog, pthread_mutex_t *inprog_lock) {
+int inprog_tracker_ll_add(Inprog_tracker_node **head, Inprog *inprog) {
 
     if(inprog == NULL)
         return -1;
@@ -287,7 +298,6 @@ int inprog_tracker_ll_add(Inprog_tracker_node **head, Inprog *inprog, pthread_mu
     }
     memset(newnode, 0, sizeof(Request_tracker_node));
     newnode->inprog = inprog;
-    newnode->inprog_lock = inprog_lock;
     newnode->next = NULL;
     if(listptr == NULL) {
         // create new head of list
@@ -333,12 +343,13 @@ void inprog_tracker_ll_print(Inprog_tracker_node **head) {
 
 Inprog_tracker_node *inprog_tracker_ll_fetch_req(Inprog_tracker_node **head, Request req) {
 
-    if(head == NULL || strcmp(req.path, "") == 0) {
+    Inprog_tracker_node *listptr = *head;
+    if(head == NULL || listptr == NULL || strcmp(req.path, "") == 0) {
         printf("List is empty/request is empty, exiting..\n");
         exit(EXIT_FAILURE);
     }
-    Inprog_tracker_node *listptr = *head;
     while(listptr != NULL) {
+        printf("checking atomic counter (inprog->ac): %llu\n", listptr->inprog->atomic_counter);
         if(listptr->inprog->atomic_counter == req.atomic_counter) {
             return listptr;
         }
@@ -387,7 +398,9 @@ int inprog_tracker_ll_remove(Inprog_tracker_node **head, Inprog inprog) {
     if(reqptr->inprog->atomic_counter == inprog.atomic_counter && reqptr->next == NULL) {
         // only 1 element in list (head), reset it but don't free the global head!
         request_ll_free(&reqptr->inprog->req_ll_head);
-        free(reqptr->inprog_lock);
+        free(reqptr->inprog->inprog_lock);
+        free(reqptr->inprog->complete_lock);
+        pthread_cond_destroy(reqptr->inprog->complete_cond);
         free(reqptr->inprog);
         reqptr = NULL;
         *head = NULL;
@@ -398,6 +411,9 @@ int inprog_tracker_ll_remove(Inprog_tracker_node **head, Inprog inprog) {
             if(reqptr->next->inprog->atomic_counter == inprog.atomic_counter) {
                 tmp = reqptr->next->next;
                 request_ll_free(&reqptr->next->inprog->req_ll_head);
+                free(reqptr->next->inprog->inprog_lock);
+                free(reqptr->next->inprog->complete_lock);
+                pthread_cond_destroy(reqptr->next->inprog->complete_cond);
                 free(reqptr->next->inprog);
                 free(reqptr->next);
                 reqptr->next = tmp;

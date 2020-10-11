@@ -33,12 +33,14 @@ typedef struct inprog {
     long long atomic_counter;
     int messages_sent;
     bool complete;
+    pthread_mutex_t *inprog_lock;
+    pthread_mutex_t *complete_lock;
+    pthread_cond_t *complete_cond;
     Request_tracker_node *req_ll_head; // head of linked list of the machines who got message
 }Inprog;
 
 typedef struct inprog_tracker_node {
     Inprog *inprog;
-    pthread_mutex_t *inprog_lock;
     struct inprog_tracker_node *next;
 }Inprog_tracker_node;
 
@@ -63,7 +65,7 @@ int request_ll_free(Request_tracker_node **head);
 void inprog_reset(Inprog *inp);
 int request_ll_complete(Request_tracker_node **head);
 int inprog_add_buf(Request *req, Inprog *inprog, pthread_mutex_t *inprog_lock);
-int inprog_tracker_ll_add(Inprog_tracker_node **head, Inprog *inprog, pthread_mutex_t *inprog_lock);
+int inprog_tracker_ll_add(Inprog_tracker_node **head, Inprog *inprog);
 void inprog_tracker_ll_print(Inprog_tracker_node **head);
 Inprog_tracker_node *inprog_tracker_ll_fetch_req(Inprog_tracker_node **head, Request req);
 Inprog_tracker_node *inprog_tracker_ll_fetch_node(Inprog_tracker_node **head, Inprog inprog);

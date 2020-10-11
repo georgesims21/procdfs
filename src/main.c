@@ -100,17 +100,25 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
          * messages are received from sender machines, if this is slow could cause race conditions */
         for(int i = 0; i < PATHARRLEN; i++) {
             if(strcmp(path, paths[i]) == 0) {
-                pthread_mutex_lock(&inprog_tracker_lock);
                 // create Inprog and lock for it - Inprog now contains ll of all requests sent to other machines
+                pthread_mutex_lock(&inprog_tracker_lock);
                 Inprog *inprog = inprog_create(pathbuf);
-                pthread_mutex_t *inprog_lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
-                pthread_mutex_init(inprog_lock, NULL);
                 // add node to linked list with this Inprog
-                inprog_tracker_ll_add(&inprog_tracker_head, inprog, inprog_lock);
+                inprog_tracker_ll_add(&inprog_tracker_head, inprog);
                 pthread_mutex_unlock(&inprog_tracker_lock);
 
-                // wait until complete -- something better than this?
-                while(!inprog->complete) {};
+                /*
+                 Previously:
+                     while(!inprog->complete) {};
+                 */
+                pthread_mutex_lock(inprog->complete_lock);
+                while(!inprog->complete) {
+                    pthread_cond_wait(inprog->complete_cond, inprog->complete_lock);
+                }
+                pthread_mutex_unlock(inprog->complete_lock);
+
+//                while(!inprog->complete) {};
+
 
                 size_t buflen = request_ll_countbuflen(&inprog->req_ll_head);
 //                Inprog_tracker_node *inptn = inprog_tracker_ll_fetch_node(&inprog_tracker_head, *inprog);
@@ -165,7 +173,7 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
             pthread_mutex_t *inprog_lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
             pthread_mutex_init(inprog_lock, NULL);
             // add node to linked list with this Inprog
-            inprog_tracker_ll_add(&inprog_tracker_head, inprog, inprog_lock);
+            inprog_tracker_ll_add(&inprog_tracker_head, inprog);
             pthread_mutex_unlock(&inprog_tracker_lock);
 
             // wait until complete -- something better than this?

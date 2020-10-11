@@ -562,10 +562,18 @@ Inprog *inprog_create(char *path) {
     a_counter++; // only increment this on new request NOT each machine (reserve 0)
     inprog->atomic_counter = a_counter;
     pthread_mutex_unlock(&a_counter_lock);
+    inprog->complete_lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+    pthread_mutex_init(inprog->complete_lock, NULL);
+    inprog->complete_cond = (pthread_cond_t *)malloc(sizeof(pthread_cond_t));
+    pthread_cond_init(inprog->complete_cond , NULL);
+    inprog->inprog_lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+    pthread_mutex_init(inprog->inprog_lock, NULL);
     for(int i = 0; i < nrmachines; i++) {
         // create request
         Request *req = req_create(connected_clients[i], inprog->atomic_counter, path);
+        pthread_mutex_lock(inprog->inprog_lock);
         add_inprog(inprog, req); // adding single request to internal inprog linked list
+        pthread_mutex_unlock(inprog->inprog_lock);
         req_tracker_ll_print(&inprog->req_ll_head);
         create_send_msg(req, FREQ);
     } // END of write for loop
@@ -699,7 +707,7 @@ void *server_loop(void *arg) {
                         // find this request in the upper linked list and return node
                         struct inprog_tracker_node *node = inprog_tracker_ll_fetch_req(&inprog_tracker_head, *req);
                         // add file buf received from other machine to the request (also checks if Inprog == complete)
-                        inprog_add_buf(req, node->inprog, node->inprog_lock);
+                        inprog_add_buf(req, node->inprog, node->inprog->inprog_lock);
                         inprog_tracker_ll_print(&inprog_tracker_head);
                         pthread_mutex_unlock(&inprog_tracker_lock);
                         break;
