@@ -41,6 +41,7 @@
 #include "ds_new.h"
 #include "server_new.h"
 #include "pathnames.h"
+#include "fileops_new.h"
 
 int nrmachines;
 long long a_counter;
@@ -101,6 +102,23 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
         for(int i = 0; i < PATHARRLEN; i++) {
             if(strcmp(path, paths[i]) == 0) {
                 Inprog *inprog = file_request(pathbuf);
+
+                if(strcmp(paths[i], _PATH_PROCNET_DEV) == 0) {
+                    char matrix[32][32][128] = {0};
+                    char newmatrix[32][32][128] = {0};
+                    procnet_dev_extract(inprog->req_ll_head->req->buf, matrix);
+                    procnet_dev_merge(matrix, matrix, newmatrix);
+                    for(int j = 0; j < 6; j++) {
+                        for(int k = 0; k < 18; k++) {
+                            printf("%s", newmatrix[j][k]);
+                        }
+                    }
+                    printf("\n");
+                    printf("(matrix) %s transmitted %s = %s\n", matrix[2][0], matrix[1][9], matrix[2][9]);
+                    printf("(newmatrix) %s transmitted %s = %s\n", newmatrix[2][0], newmatrix[1][9], newmatrix[2][9]);
+                    exit(EXIT_SUCCESS);
+                }
+
                 size_t buflen = request_ll_countbuflen(&inprog->req_ll_head);
 //            inprog_tracker_ll_print(&inprog_tracker_head);
                 pthread_mutex_lock(&inprog_tracker_lock);
@@ -148,6 +166,7 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
             final_path(path, pathbuf);
             printf("getattr called on : %s\n", pathbuf);
             Inprog *inprog = file_request(pathbuf);
+
             char *filebuf = request_ll_catbuf(&inprog->req_ll_head);
             unsigned int buflen = strlen(filebuf);
 //        inprog_tracker_ll_print(&inprog_tracker_head);

@@ -9,7 +9,7 @@ add_executable(procsys
         src/main.c
         src/server_new.c src/server_new.h
         src/ds_new.h src/ds_new.c
-        src/pathnames.h)
+        src/pathnames.h src/fileops_new.c src/fileops_new.h)
 
 target_compile_definitions(${PROJECT_NAME} PUBLIC USE_FUSE3 FUSE_USE_VERSION=35)
 target_compile_options(procsys PUBLIC -Wall -Wextra -Wpedantic -g)
