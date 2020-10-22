@@ -67,8 +67,16 @@ int procnet_dev_merge(char (*matrix1)[32][128], char (*matrix2)[32][128], char (
      */
     char row[32][128] = {0};
     char matrix3[32][32][128] = {0};
+
+    // Fill in first 2 rows with header info
+    for(int i = 0; i < 2; i++) {
+        for(int j = 0; j < 32; j++) {
+            memcpy(retmatrix[i][j], matrix1[i][j], strlen(matrix1[i][j]));
+        }
+    }
+
     // need to copy rows 1 and 2 to matrix 3
-    int row_count = 2;
+    int row_count = 2; // to keep consistent rows for new matrix (or could be row 1, 3, 7 have text etc)
     for(int i = 2; i < 32; i++) { // matrix1
         // get one value from here, need to save it into matrix 3
         for(int ii = 2; ii < 32; ii++) { // matrix2
