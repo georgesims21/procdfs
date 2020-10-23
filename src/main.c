@@ -120,7 +120,7 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
                     procnet_dev_extract(hostdev, matrix2);
                     procnet_dev_merge(matrix2, newmatrix, newmatrix, &row_count);
                     for(int j = 0; j < 32; j++) {
-                        for(int k = 0; k < 17; k++) {
+                        for(int k = 0; k <= 17; k++) {
                             printf("%s", newmatrix[j][k]);
                         }
                     }

@@ -114,7 +114,7 @@ int procnet_dev_merge(char (*matrix1)[32][128], char (*matrix2)[32][128], char (
     // need to copy rows 1 and 2 to matrix 3
     for(int i = 2; i < 32; i++) { // matrix1
         if(strcmp(matrix1[i][0], "") == 0) {
-            // to avoid overflow
+            // to avoid overread
             break;
         }
         // get one value from here, need to save it into matrix 3
@@ -124,7 +124,10 @@ int procnet_dev_merge(char (*matrix1)[32][128], char (*matrix2)[32][128], char (
                 break;
             }
             // check all of values in here against one from matrix 1
-            if(strncmp(matrix1[i][0], matrix2[ii][0], strlen(matrix1[i][0])) == 0) {
+            printf("matrix1[%d][0]: \"%s\"  -  matrix2[%d][0]: \"%s\"\n", i, matrix1[i][0], ii, matrix2[ii][0]);
+//            if(strncmp(matrix1[i][0], matrix2[ii][0], strlen(matrix1[i][0])) == 0) {
+            if(strcmp(matrix1[i][0], matrix2[ii][0]) == 0) {
+                printf("Matching\n");
                 // copy interface name in first index
                 memcpy(retmatrix[*row_count][0], matrix1[i][0], strlen(matrix1[i][0]));
                 // go through indexes replacing string with merged counterpart
@@ -159,10 +162,11 @@ int procnet_dev_merge(char (*matrix1)[32][128], char (*matrix2)[32][128], char (
                 (*row_count)++;
                 break;
             }
+            printf("not matching\n");
         }
         // here the row wasn't found in matrix2
         if(add_row) {
-            for(int j = 0; j < 17; j++) {
+            for(int j = 0; j <= 17; j++) {
                 memcpy(retmatrix[*row_count][j], matrix1[i][j], strlen(matrix1[i][j]));
             }
             (*row_count)++;
