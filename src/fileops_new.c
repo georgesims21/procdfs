@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include "fileops_new.h"
 
 
@@ -53,6 +54,37 @@ int procnet_dev_extract(char *filebuf, char (*matrix)[32][128]) {
     return 0;
 }
 
+int extractor(char *string, char *before, char *digit, char *after) {
+
+    if(!string) {
+        printf("Given empty string!\n");
+        exit(EXIT_FAILURE);
+    }
+    if(strncmp(string, "", 1) == 0) {
+        return 2;
+    }
+    size_t len = strlen(string);
+    char *c = string;
+    if(*c == '\n') {
+        return 1;
+    }
+    int count = 0;
+    while(!(*c >= '0' && *c <= '9')) {
+        // 'before'
+        strncat(before, c, 1);
+        c++; count++;
+    }
+    while(*c >= '0' && *c <= '9') {
+        // 'digit'
+        strncat(digit, c, 1);
+        c++; count++;
+    }
+//    size_t len = strlen(string) - strlen(before) - strlen(after);
+    memcpy(after, &string[count], strlen(string) - count);
+    after[len] = '\0';
+    return 0;
+}
+
 int procnet_dev_merge(char (*matrix1)[32][128], char (*matrix2)[32][128], char (*retmatrix)[32][128]) {
 
     /*
@@ -67,8 +99,9 @@ int procnet_dev_merge(char (*matrix1)[32][128], char (*matrix2)[32][128], char (
      */
     char row[32][128] = {0};
     char matrix3[32][32][128] = {0};
+    bool add_row = false;
 
-    // Fill in first 2 rows with header info
+    // Fill in first 2 rows with header info -- will always overwrite, wasteful
     for(int i = 0; i < 2; i++) {
         for(int j = 0; j < 32; j++) {
             memcpy(retmatrix[i][j], matrix1[i][j], strlen(matrix1[i][j]));
@@ -78,31 +111,58 @@ int procnet_dev_merge(char (*matrix1)[32][128], char (*matrix2)[32][128], char (
     // need to copy rows 1 and 2 to matrix 3
     int row_count = 2; // to keep consistent rows for new matrix (or could be row 1, 3, 7 have text etc)
     for(int i = 2; i < 32; i++) { // matrix1
+        if(strcmp(matrix1[i][0], "") == 0) {
+            // to avoid overflow
+            break;
+        }
         // get one value from here, need to save it into matrix 3
         for(int ii = 2; ii < 32; ii++) { // matrix2
+            if(strcmp(matrix2[ii][0], "") == 0) {
+                add_row = true;
+                break;
+            }
             // check all of values in here against one from matrix 1
             if(strncmp(matrix1[i][0], matrix2[ii][0], strlen(matrix1[i][0])) == 0) {
-                // if they do match, merge the values in row: need to add [i][0] to matrix3
-                for(int j = 1; j < 32; j++) { // matrix2, row iterator
-                    long val1 = strtol(matrix1[i][j], NULL, 10);
-                    long val2 = strtol(matrix2[ii][j], NULL, 10);
+                // copy interface name in first index
+                memcpy(retmatrix[row_count][0], matrix1[i][0], strlen(matrix1[i][0]));
+                // go through indexes replacing string with merged counterpart
+                for(int j = 1; j <= 17; j++) { // matrix2, row iterator
+                    char m1_before[128] = {0};
+                    char m1_digit[128] = {0};
+                    char m1_after[128] = {0};
+                    char m2_before[128] = {0};
+                    char m2_digit[128] = {0};
+                    char m2_after[128] = {0};
+                    int ext = 0;
+
+                    if((ext = extractor(matrix1[i][j], m1_before, m1_digit, m1_after) == 1)) {
+                        // new line, need to skip calculations
+                        strcpy(retmatrix[row_count][j], "\n");
+                        goto skip_calc;
+                    } else if(ext == 2) {
+                        break;
+                    }
+                    if(extractor(matrix2[ii][j], m2_before, m2_digit, m2_after) == 1) {
+                        // if newline was found, first conditional should see it
+                        goto skip_calc;
+                    }
+                    long val1 = strtol(m1_digit, NULL, 10);
+                    long val2 = strtol(m2_digit, NULL, 10);
                     long final = val1 + val2;
                     /* Here need to use formatting from original (matrix1[i][j] or 2[ii][j]) string
                        need to save everything except the numbers themselves*/
-                    snprintf(retmatrix[row_count][j], sizeof(final), "%lu", final);
+                    snprintf(retmatrix[row_count][j], strlen(m1_before) + sizeof(long) + strlen(m1_after), "%s%lu%s", m1_before, final, m1_after);
                 }
+                skip_calc:
                 row_count++;
-                break; // should break out of matrix 2 loop
-            }
-            if(ii++ == 32) {
-                // not found,
+                break;
             }
         }
+        // here the row wasn't found in matrix2
+        if(add_row) {
+            memcpy(retmatrix[row_count], matrix1[i], 17*128);
+            row_count++;
+        }
     }
-//    for(int i = 2; i < 32; i++) {
-//        for(int j = 1; j < 32; j++) {
-//
-//        }
-//    }
     return 0;
 }

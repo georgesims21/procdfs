@@ -102,10 +102,11 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
         for(int i = 0; i < PATHARRLEN; i++) {
             if(strcmp(path, paths[i]) == 0) {
                 Inprog *inprog = file_request(pathbuf);
-
                 if(strcmp(paths[i], _PATH_PROCNET_DEV) == 0) {
                     char matrix[32][32][128] = {0};
                     char newmatrix[32][32][128] = {0};
+                    // need to run this in loop with all request reply buffers, merging with
+                    // the newmatrix each time. i.e merge (reqbuf[i], newmatrix, newmatrix)
                     procnet_dev_extract(inprog->req_ll_head->req->buf, matrix);
                     procnet_dev_merge(matrix, matrix, newmatrix);
                     for(int j = 0; j < 6; j++) {
