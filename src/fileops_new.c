@@ -4,6 +4,26 @@
 #include <stdbool.h>
 #include "fileops_new.h"
 
+int interfacecmp(char *first, char *second) {
+    char *c1 = first;
+    char *c2 = second;
+
+    while(*c1 != '\0' && *c2 != '\0') {
+        // move pointers to first char
+        while(strncmp(c1, " ", 1) == 0)
+            c1++;
+        while(strncmp(c2, " ", 1) == 0)
+            c2++;
+        int count = 0;
+        while(*c1 == *c2) {
+            c1++; c2++; count++;
+            if(count >= 2)
+                return 0;
+        }
+        return 1;
+    }
+    return 1;
+}
 
 int procnet_dev_extract(char *filebuf, char (*matrix)[32][128]) {
 
@@ -87,20 +107,7 @@ int extractor(char *string, char *before, char *digit, char *after) {
 
 int procnet_dev_merge(char (*matrix1)[32][128], char (*matrix2)[32][128], char (*retmatrix)[32][128], int *row_count) {
 
-    /*
-     * keep in mind that machines may not share the same interfaces so if it doesn't exist on both,
-     * still save it but on a different line. If both share it then merge the whole row (may be on different
-     * rows)
-     *
-         * rows 0 and 1 are reserved, 2 is where interfaces start ([2][0] == first interface)
-         * Column 0 is reserved on each row for the name
-         * Will always be 18 columns - can use 2d array to save unmatched interfaces and write these
-         * to the final 3d array at the end
-     */
-    char row[32][128] = {0};
-    char matrix3[32][32][128] = {0};
     bool add_row = false;
-
     if(*row_count == 0) {
         // first run/merge so add header info
         for(int i = 0; i < 2; i++) {
@@ -124,12 +131,13 @@ int procnet_dev_merge(char (*matrix1)[32][128], char (*matrix2)[32][128], char (
                 break;
             }
             // check all of values in here against one from matrix 1
+            char *m1interface = matrix1[i][0];
+            char *m2interface = matrix2[ii][0];
             printf("matrix1[%d][0]: \"%s\"  -  matrix2[%d][0]: \"%s\"\n", i, matrix1[i][0], ii, matrix2[ii][0]);
-//            if(strncmp(matrix1[i][0], matrix2[ii][0], strlen(matrix1[i][0])) == 0) {
-            if(strcmp(matrix1[i][0], matrix2[ii][0]) == 0) {
+            if(interfacecmp(matrix1[i][0], matrix2[ii][0]) == 0) {
                 printf("Matching\n");
                 // copy interface name in first index
-                memcpy(retmatrix[*row_count][0], matrix1[i][0], strlen(matrix1[i][0]));
+                memcpy(retmatrix[ii][0], matrix1[i][0], strlen(matrix1[i][0]));
                 // go through indexes replacing string with merged counterpart
                 for(int j = 1; j <= 17; j++) { // matrix2, row iterator
                     char m1_before[128] = {0};
@@ -142,7 +150,7 @@ int procnet_dev_merge(char (*matrix1)[32][128], char (*matrix2)[32][128], char (
 
                     if((ext = extractor(matrix1[i][j], m1_before, m1_digit, m1_after) == 1)) {
                         // new line, need to skip calculations
-                        strcpy(retmatrix[*row_count][j], "\n");
+                        strcpy(retmatrix[ii][j], "\n");
                         goto skip_calc;
                     } else if(ext == 2) {
                         break;
@@ -156,10 +164,9 @@ int procnet_dev_merge(char (*matrix1)[32][128], char (*matrix2)[32][128], char (
                     long final = val1 + val2;
                     /* Here need to use formatting from original (matrix1[i][j] or 2[ii][j]) string
                        need to save everything except the numbers themselves*/
-                    snprintf(retmatrix[*row_count][j], strlen(m1_before) + sizeof(long) + strlen(m1_after), "%s%lu%s", m1_before, final, m1_after);
+                    snprintf(retmatrix[ii][j], strlen(m1_before) + sizeof(long) + strlen(m1_after), "%s%lu%s", m1_before, final, m1_after);
                 }
                 skip_calc:
-                (*row_count)++;
                 break;
             }
             printf("not matching\n");
@@ -170,6 +177,7 @@ int procnet_dev_merge(char (*matrix1)[32][128], char (*matrix2)[32][128], char (
                 memcpy(retmatrix[*row_count][j], matrix1[i][j], strlen(matrix1[i][j]));
             }
             (*row_count)++;
+            add_row = false;
         }
     }
     return 0;

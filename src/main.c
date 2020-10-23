@@ -113,6 +113,12 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
                         // needs to iterate over all of the request bufs
                         procnet_dev_extract(inprog->req_ll_head->req->buf, matrix);
                         procnet_dev_merge(matrix, newmatrix, newmatrix, &row_count);
+                        printf("After first merge\n");
+                        for(int jj = 0; jj < 32; jj++) {
+                            for(int k = 0; k <= 17; k++) {
+                                printf("%s", newmatrix[jj][k]);
+                            }
+                        }
                     }
                     char matrix2[32][32][128] = {0};
                     char newmatrix2[32][32][128] = {0};
