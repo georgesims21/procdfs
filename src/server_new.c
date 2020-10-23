@@ -47,6 +47,26 @@ void final_path(const char *path, char *buf) {
     free(tmp);
 }
 
+char *filebuf(const char *path) {
+
+    int fd = -1, res = 0, offset = 0, size = 0;
+    fd = openat(AT_FDCWD, path, O_RDONLY);
+    if (fd == -1) {
+        perror("openat");
+        printf("%s\n", path);
+        exit (EXIT_FAILURE);
+    }
+    size = procsizefd(fd); // individually count chars in proc file - bottleneck for large fs
+    char *procbuf = malloc(sizeof(char) * size);
+    if(!procbuf){malloc_error();};
+    res = pread(fd, procbuf, size, offset);
+    if (res == -1) {
+        perror("pread");
+        exit(EXIT_FAILURE);
+    }
+    return procbuf;
+}
+
 void lprintf(const char *fmt, ...) {
 //    https://stackoverflow.com/questions/7031116/how-to-create-function-like-printf-variable-argument
     va_list arg;

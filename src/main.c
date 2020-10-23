@@ -103,20 +103,29 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
             if(strcmp(path, paths[i]) == 0) {
                 Inprog *inprog = file_request(pathbuf);
                 if(strcmp(paths[i], _PATH_PROCNET_DEV) == 0) {
-                    char matrix[32][32][128] = {0};
                     char newmatrix[32][32][128] = {0};
-                    // need to run this in loop with all request reply buffers, merging with
-                    // the newmatrix each time. i.e merge (reqbuf[i], newmatrix, newmatrix)
-                    procnet_dev_extract(inprog->req_ll_head->req->buf, matrix);
-                    procnet_dev_merge(matrix, matrix, newmatrix);
-                    for(int j = 0; j < 6; j++) {
-                        for(int k = 0; k < 18; k++) {
+                    int row_count = 0;
+                    /* need to run this in loop with all request reply buffers, merging with
+                    the newmatrix each time. i.e merge (reqbuf[i], newmatrix, newmatrix). Also
+                     need to get this machines file and turn into matrix, best to do last out of loop */
+                    for(int j = 0; j < inprog->messages_sent; j++) {
+                        char matrix[32][32][128] = {0};
+                        // needs to iterate over all of the request bufs
+                        procnet_dev_extract(inprog->req_ll_head->req->buf, matrix);
+                        procnet_dev_merge(matrix, newmatrix, newmatrix, &row_count);
+                    }
+                    char matrix2[32][32][128] = {0};
+                    char newmatrix2[32][32][128] = {0};
+                    char *hostdev = filebuf(pathbuf);
+                    procnet_dev_extract(hostdev, matrix2);
+                    procnet_dev_merge(matrix2, newmatrix, newmatrix, &row_count);
+                    for(int j = 0; j < 32; j++) {
+                        for(int k = 0; k < 17; k++) {
                             printf("%s", newmatrix[j][k]);
                         }
                     }
                     printf("\n");
-                    printf("(matrix) %s transmitted %s = %s\n", matrix[2][0], matrix[1][9], matrix[2][9]);
-                    printf("(newmatrix) %s transmitted %s = %s\n", newmatrix[2][0], newmatrix[1][9], newmatrix[2][9]);
+//                    printf("(newmatrix) %s transmitted %s = %s\n", newmatrix[2][0], newmatrix[1][9], newmatrix[2][9]);
                     exit(EXIT_SUCCESS);
                 }
 

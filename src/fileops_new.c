@@ -85,7 +85,7 @@ int extractor(char *string, char *before, char *digit, char *after) {
     return 0;
 }
 
-int procnet_dev_merge(char (*matrix1)[32][128], char (*matrix2)[32][128], char (*retmatrix)[32][128]) {
+int procnet_dev_merge(char (*matrix1)[32][128], char (*matrix2)[32][128], char (*retmatrix)[32][128], int *row_count) {
 
     /*
      * keep in mind that machines may not share the same interfaces so if it doesn't exist on both,
@@ -101,15 +101,17 @@ int procnet_dev_merge(char (*matrix1)[32][128], char (*matrix2)[32][128], char (
     char matrix3[32][32][128] = {0};
     bool add_row = false;
 
-    // Fill in first 2 rows with header info -- will always overwrite, wasteful
-    for(int i = 0; i < 2; i++) {
-        for(int j = 0; j < 32; j++) {
-            memcpy(retmatrix[i][j], matrix1[i][j], strlen(matrix1[i][j]));
+    if(*row_count == 0) {
+        // first run/merge so add header info
+        for(int i = 0; i < 2; i++) {
+            for(int j = 0; j < 32; j++) {
+                memcpy(retmatrix[i][j], matrix1[i][j], strlen(matrix1[i][j]));
+            }
+            (*row_count)++;
         }
     }
 
     // need to copy rows 1 and 2 to matrix 3
-    int row_count = 2; // to keep consistent rows for new matrix (or could be row 1, 3, 7 have text etc)
     for(int i = 2; i < 32; i++) { // matrix1
         if(strcmp(matrix1[i][0], "") == 0) {
             // to avoid overflow
@@ -124,7 +126,7 @@ int procnet_dev_merge(char (*matrix1)[32][128], char (*matrix2)[32][128], char (
             // check all of values in here against one from matrix 1
             if(strncmp(matrix1[i][0], matrix2[ii][0], strlen(matrix1[i][0])) == 0) {
                 // copy interface name in first index
-                memcpy(retmatrix[row_count][0], matrix1[i][0], strlen(matrix1[i][0]));
+                memcpy(retmatrix[*row_count][0], matrix1[i][0], strlen(matrix1[i][0]));
                 // go through indexes replacing string with merged counterpart
                 for(int j = 1; j <= 17; j++) { // matrix2, row iterator
                     char m1_before[128] = {0};
@@ -137,7 +139,7 @@ int procnet_dev_merge(char (*matrix1)[32][128], char (*matrix2)[32][128], char (
 
                     if((ext = extractor(matrix1[i][j], m1_before, m1_digit, m1_after) == 1)) {
                         // new line, need to skip calculations
-                        strcpy(retmatrix[row_count][j], "\n");
+                        strcpy(retmatrix[*row_count][j], "\n");
                         goto skip_calc;
                     } else if(ext == 2) {
                         break;
@@ -151,17 +153,19 @@ int procnet_dev_merge(char (*matrix1)[32][128], char (*matrix2)[32][128], char (
                     long final = val1 + val2;
                     /* Here need to use formatting from original (matrix1[i][j] or 2[ii][j]) string
                        need to save everything except the numbers themselves*/
-                    snprintf(retmatrix[row_count][j], strlen(m1_before) + sizeof(long) + strlen(m1_after), "%s%lu%s", m1_before, final, m1_after);
+                    snprintf(retmatrix[*row_count][j], strlen(m1_before) + sizeof(long) + strlen(m1_after), "%s%lu%s", m1_before, final, m1_after);
                 }
                 skip_calc:
-                row_count++;
+                (*row_count)++;
                 break;
             }
         }
         // here the row wasn't found in matrix2
         if(add_row) {
-            memcpy(retmatrix[row_count], matrix1[i], 17*128);
-            row_count++;
+            for(int j = 0; j < 17; j++) {
+                memcpy(retmatrix[*row_count][j], matrix1[i][j], strlen(matrix1[i][j]));
+            }
+            (*row_count)++;
         }
     }
     return 0;

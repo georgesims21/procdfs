@@ -112,5 +112,6 @@ void calloc_error(void);
 int procsizefd(int fd);
 void final_path(const char *path, char *buf);
 Inprog *file_request(const char *path);
+char *filebuf(const char *path);
 
 #endif //PROCSYS_SERVER_NEW_H
