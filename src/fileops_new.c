@@ -4,7 +4,30 @@
 #include <stdbool.h>
 #include "fileops_new.h"
 
+char *mat2buf(char (*matrix)[32][128]) {
+
+    size_t size = 1;
+    char *buf = calloc(1,size);
+    for(int i = 0; i < 32; i++) {
+        // find size (how many rows this matrix has)
+        if(strncmp(matrix[i][0], "", 1) == 0) {
+            break;
+        }
+        for(int j = 0; j <= 17; j++) {
+            if(strncmp(matrix[i][j], "", 1) == 0) {
+                break;
+            }
+            size += strlen(matrix[i][j]);
+            buf = realloc(buf, size);
+            strncat(buf, matrix[i][j], strlen(matrix[i][j]));
+        }
+    }
+    buf[size] = '\0';
+    return buf;
+}
+
 int interfacecmp(char *first, char *second) {
+
     char *c1 = first;
     char *c2 = second;
 
@@ -117,7 +140,6 @@ int procnet_dev_merge(char (*matrix1)[32][128], char (*matrix2)[32][128], char (
             (*row_count)++;
         }
     }
-
     // need to copy rows 1 and 2 to matrix 3
     for(int i = 2; i < 32; i++) { // matrix1
         if(strcmp(matrix1[i][0], "") == 0) {
@@ -131,11 +153,7 @@ int procnet_dev_merge(char (*matrix1)[32][128], char (*matrix2)[32][128], char (
                 break;
             }
             // check all of values in here against one from matrix 1
-            char *m1interface = matrix1[i][0];
-            char *m2interface = matrix2[ii][0];
-            printf("matrix1[%d][0]: \"%s\"  -  matrix2[%d][0]: \"%s\"\n", i, matrix1[i][0], ii, matrix2[ii][0]);
             if(interfacecmp(matrix1[i][0], matrix2[ii][0]) == 0) {
-                printf("Matching\n");
                 // copy interface name in first index
                 memcpy(retmatrix[ii][0], matrix1[i][0], strlen(matrix1[i][0]));
                 // go through indexes replacing string with merged counterpart
@@ -169,7 +187,6 @@ int procnet_dev_merge(char (*matrix1)[32][128], char (*matrix2)[32][128], char (
                 skip_calc:
                 break;
             }
-            printf("not matching\n");
         }
         // here the row wasn't found in matrix2
         if(add_row) {

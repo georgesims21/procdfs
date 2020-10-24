@@ -108,35 +108,24 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
                     /* need to run this in loop with all request reply buffers, merging with
                     the newmatrix each time. i.e merge (reqbuf[i], newmatrix, newmatrix). Also
                      need to get this machines file and turn into matrix, best to do last out of loop */
+                    Request_tracker_node *rptr = inprog->req_ll_head;
                     for(int j = 0; j < inprog->messages_sent; j++) {
                         char matrix[32][32][128] = {0};
                         // needs to iterate over all of the request bufs
-                        procnet_dev_extract(inprog->req_ll_head->req->buf, matrix);
+                        procnet_dev_extract(rptr->req->buf, matrix);
                         procnet_dev_merge(matrix, newmatrix, newmatrix, &row_count);
-                        printf("After first merge\n");
-                        for(int jj = 0; jj < 32; jj++) {
-                            for(int k = 0; k <= 17; k++) {
-                                printf("%s", newmatrix[jj][k]);
-                            }
-                        }
+                        rptr = rptr->next;
                     }
                     char matrix2[32][32][128] = {0};
-                    char newmatrix2[32][32][128] = {0};
                     char *hostdev = filebuf(pathbuf);
                     procnet_dev_extract(hostdev, matrix2);
                     procnet_dev_merge(matrix2, newmatrix, newmatrix, &row_count);
-                    for(int j = 0; j < 32; j++) {
-                        for(int k = 0; k <= 17; k++) {
-                            printf("%s", newmatrix[j][k]);
-                        }
-                    }
-                    printf("\n");
-//                    printf("(newmatrix) %s transmitted %s = %s\n", newmatrix[2][0], newmatrix[1][9], newmatrix[2][9]);
-                    exit(EXIT_SUCCESS);
+                    char *ret = mat2buf(newmatrix);
+                    stbuf->st_size = strlen(ret);
+                    return 0;
                 }
 
                 size_t buflen = request_ll_countbuflen(&inprog->req_ll_head);
-//            inprog_tracker_ll_print(&inprog_tracker_head);
                 pthread_mutex_lock(&inprog_tracker_lock);
                 // delete inprog from list
                 inprog_tracker_ll_remove(&inprog_tracker_head, *inprog);
@@ -175,6 +164,8 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
                         struct fuse_file_info *fi) {
     (void)fi;
     printf("\n\nreading file: %s\noffset: %ld\nsize: %lu\n", path, offset, size);
+    size_t buflen = 0;
+    char *buffer = NULL;
 
     for(int i = 0; i < PATHARRLEN; i++) {
         if(strcmp(path, paths[i]) == 0) {
@@ -182,27 +173,46 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
             final_path(path, pathbuf);
             printf("getattr called on : %s\n", pathbuf);
             Inprog *inprog = file_request(pathbuf);
-
-            char *filebuf = request_ll_catbuf(&inprog->req_ll_head);
-            unsigned int buflen = strlen(filebuf);
+            if(strcmp(paths[i], _PATH_PROCNET_DEV) == 0) {
+                char newmatrix[32][32][128] = {0};
+                int row_count = 0;
+                Request_tracker_node *rptr = inprog->req_ll_head;
+                for(int j = 0; j < inprog->messages_sent; j++) {
+                    char matrix[32][32][128] = {0};
+                    // needs to iterate over all of the request bufs
+                    procnet_dev_extract(rptr->req->buf, matrix);
+                    procnet_dev_merge(matrix, newmatrix, newmatrix, &row_count);
+                    rptr = rptr->next;
+                }
+                char matrix2[32][32][128] = {0};
+                char *hostdev = filebuf(pathbuf);
+                procnet_dev_extract(hostdev, matrix2);
+                procnet_dev_merge(matrix2, newmatrix, newmatrix, &row_count);
+                buffer = mat2buf(newmatrix);
+                buflen = strlen(buffer);
+                goto skip;
+            }
+            buffer = request_ll_catbuf(&inprog->req_ll_head);
+            buflen = strlen(buffer);
+            skip:
 //        inprog_tracker_ll_print(&inprog_tracker_head);
             pthread_mutex_lock(&inprog_tracker_lock);
             // delete inprog from list
             inprog_tracker_ll_remove(&inprog_tracker_head, *inprog);
             pthread_mutex_unlock(&inprog_tracker_lock);
             if (offset >= buflen) {
-                free(filebuf);
+                free(buffer);
                 return 0;
             }
 
             if (offset + size > buflen) {
-                memcpy(buf, filebuf + offset, buflen - offset);
-                free(filebuf);
+                memcpy(buf, buffer + offset, buflen - offset);
+                free(buffer);
                 return buflen - offset;
             }
 
-            memcpy(buf, filebuf + offset, size);
-            free(filebuf);
+            memcpy(buf, buffer + offset, size);
+            free(buffer);
             return size;
         }
     }
