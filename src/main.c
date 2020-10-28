@@ -122,6 +122,7 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
                     procnet_dev_merge(matrix2, newmatrix, newmatrix, &row_count);
                     char *ret = mat2buf(newmatrix);
                     stbuf->st_size = strlen(ret);
+                    free(ret);
                     return 0;
                 }
 
