@@ -1,4 +1,5 @@
-# procsys
+# procdfs
+## procfs, distributed
 Once cloned run:
 ```bash
 mkdir build
