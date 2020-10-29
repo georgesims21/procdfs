@@ -1,8 +1,7 @@
 #!/bin/bash
 
-mkdir -p /home/vagrant/shared/procsys/build_box1/mountdir
+mkdir -p /home/vagrant/mountdir
 cd /home/vagrant/shared/procsys/build_box1
-pwd
 ../scripts/unmount_box1.sh
 
 cmake ..

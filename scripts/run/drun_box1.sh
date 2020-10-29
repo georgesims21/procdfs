@@ -12,6 +12,7 @@ gdb -q \
     -ex 'set print thread-events off' \
     -ex 'handle SIGALRM nostop pass' \
     -ex 'handle SIGCHLD nostop pass' \
+    -ex 'break fileops_new.c:169' \
     -ex 'run' \
     -ex 'thread apply all backtrace' \
     --args \

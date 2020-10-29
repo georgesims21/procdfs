@@ -1,5 +1,5 @@
 #!/bin/bash
-mount="/home/vagrant/shared/procsys/build_box1/mountdir"
+mount="/home/vagrant/mountdir"
 
 if grep -qs "$mount" /proc/mounts; then
   fusermount "$mount" -u  2>&1
