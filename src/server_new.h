@@ -67,37 +67,7 @@ void *server_loop(void *arg);
  *      noise on fdset:
  *          client disconnect:
  *              disconnect_client()
- * TODO
- *          *need to think about send/recv not reading/sending all bytes in one call!:*
-     *          Create the header ()
-         *          need hostip and port
-         *          receiverip and port
-         *          atomic counter
-         *          filepath
-     *          Add flag ()
-     *          Add payload () - if request was recieved
-     *          Get message size ()
-     *          put them together and send
- *          parse flag()
- *          file request:
- *              malloc Request fr;
- *              extract_file_request(fr, host_addr)
- *              fetch file contents:
- *                  remember to realloc fr with size of file and save into buf
- *              malloc buffer to send over socket with length of fr
- *              create_request(fr, frlen, buf, buflen)
- *              free(fr)
- *              send request to caller
- *              free(buf)
- *          file content:
- *              *message request struct already exists for this*
- *              malloc Request fc;
- *              extract_content_request(fc, host_addr)
- *              mark_as_received(fc, inpr_ll_ptr, inprog_tracker_ll_lock)
- *
  */
-
-// statics
 struct new_connection_args {
     Address *conn_clients; pthread_mutex_t *conn_clients_lock;
     Address host_addr;

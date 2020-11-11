@@ -113,9 +113,12 @@ int extractor(char *string, char *before, char *digit, char *after) {
     }
     int count = 0;
     while(!(*c >= '0' && *c <= '9')) {
-        // 'before'
-        strncat(before, c, 1);
-        c++; count++;
+            // 'before'
+//            printf("c (hex): %x\n", *c);
+            strncat(before, c, 1);
+            c++; count++;
+            if(count > 128)
+                exit(1);
     }
     while(*c >= '0' && *c <= '9') {
         // 'digit'
@@ -123,6 +126,8 @@ int extractor(char *string, char *before, char *digit, char *after) {
         c++; count++;
     }
 //    size_t len = strlen(string) - strlen(before) - strlen(after);
+//    printf("after: %s\nstring: %s\ncount = %d\nstrlen(string) = %ld\nstrlen(string) - count = %ld\n",
+//           after, string, count, strlen(string), strlen(string) - count);
     memcpy(after, &string[count], strlen(string) - count);
     after[len] = '\0';
     return 0;
@@ -165,6 +170,9 @@ int procnet_dev_merge(char (*matrix1)[32][128], char (*matrix2)[32][128], char (
                     char m2_digit[128] = {0};
                     char m2_after[128] = {0};
                     int ext = 0;
+
+//                    if(i == 6 && j == 1)
+//                        printf("\n\n =====here===== \n\n");
 
                     if((ext = extractor(matrix1[i][j], m1_before, m1_digit, m1_after) == 1)) {
                         // new line, need to skip calculations

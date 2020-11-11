@@ -93,7 +93,7 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
     } else {
         char pathbuf[MAXPATH] = {0};
         final_path(path, pathbuf);
-        printf("getattr called on (pathbuf): %s\n", pathbuf);
+        printf("===getattr called on (pathbuf): %s====\n", pathbuf);
         // files
         stbuf->st_mode = S_IFREG | 0444;
         stbuf->st_nlink = 1; // only located here, nowhere else yet
@@ -115,11 +115,36 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
                         procnet_dev_extract(rptr->req->buf, matrix);
                         procnet_dev_merge(matrix, newmatrix, newmatrix, &row_count);
                         rptr = rptr->next;
+                        printf("Merged matrix: %d\n", j);
+                        for(int ii = 0; ii < 32; ii++) {
+                            for(int jj = 0; jj < 32; jj++) {
+                                printf("%s", newmatrix[ii][jj]);
+                            }
+                        }
                     }
                     char matrix2[32][32][128] = {0};
                     char *hostdev = filebuf(pathbuf);
+                    printf("accumulated matrix :\n");
+                    for(int ii = 0; ii < 32; ii++) {
+                        for(int jj = 0; jj < 32; jj++) {
+                            printf("%s", newmatrix[ii][jj]);
+                        }
+                    }
                     procnet_dev_extract(hostdev, matrix2);
+                    printf("host matrix :\n");
+                    for(int ii = 0; ii < 32; ii++) {
+                        for(int jj = 0; jj < 32; jj++) {
+                            printf("%s", matrix2[ii][jj]);
+                        }
+                    }
+                    printf("Before merging host's matrix\n");
                     procnet_dev_merge(matrix2, newmatrix, newmatrix, &row_count);
+                    printf("After merging host's matrix\n");
+                    for(int ii = 0; ii < 32; ii++) {
+                        for(int jj = 0; jj < 32; jj++) {
+                            printf("%s", newmatrix[ii][jj]);
+                        }
+                    }
                     char *ret = mat2buf(newmatrix);
                     stbuf->st_size = strlen(ret);
                     free(ret);
@@ -144,7 +169,7 @@ static int procsys_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     (void)offset;
     (void)fi;
     (void)flags;
-    printf("readdir\n");
+    printf("====readdir=====\n");
 
     filler( buf, ".", NULL, 0, 0); // Current Directory
     filler( buf, "..", NULL, 0, 0); // Parent Directory
@@ -164,7 +189,7 @@ static int procsys_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
                         struct fuse_file_info *fi) {
     (void)fi;
-    printf("\n\nreading file: %s\noffset: %ld\nsize: %lu\n", path, offset, size);
+    printf("\n\n=====reading file: %s=======\noffset: %ld\nsize: %lu\n", path, offset, size);
     size_t buflen = 0;
     char *buffer = NULL;
 
