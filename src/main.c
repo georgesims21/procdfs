@@ -14,7 +14,7 @@
 #define _XOPEN_SOURCE 700
 #endif
 
-#include <fuse3/fuse.h>
+#include <fuse.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -50,26 +50,6 @@ Inprog_tracker_node *inprog_tracker_head;
 pthread_mutex_t connected_clients_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t inprog_tracker_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t a_counter_lock = PTHREAD_MUTEX_INITIALIZER;
-
-static void *procsys_init(struct fuse_conn_info *conn,
-                      struct fuse_config *cfg) {
-
-    (void) conn;
-    cfg->use_ino = 1;
-
-    /* Pick up changes from lower filesystem right away. This is
-       also necessary for better hardlink support. When the kernel
-       calls the unlink() handler, it does not know the inode of
-       the to-be-removed entry and can therefore not invalidate
-       the cache of the associated inode - resulting in an
-       incorrect st_nlink value being reported for any remaining
-       hardlinks to this inode. */
-    cfg->entry_timeout = 0;
-    cfg->attr_timeout = 0;
-    cfg->negative_timeout = 0;
-
-    return NULL;
-}
 
 static int procsys_getattr(const char *path, struct stat *stbuf,
                        struct fuse_file_info *fi) {
@@ -115,22 +95,20 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
 }
 
 static int procsys_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-                           off_t offset, struct fuse_file_info *fi,
-                           enum fuse_readdir_flags flags) {
+                           off_t offset, struct fuse_file_info *fi) {
     (void)offset;
     (void)fi;
-    (void)flags;
     printf("readdir\n");
 
-    filler( buf, ".", NULL, 0, 0); // Current Directory
-    filler( buf, "..", NULL, 0, 0); // Parent Directory
+    filler( buf, ".", NULL, 0); // Current Directory
+    filler( buf, "..", NULL, 0); // Parent Directory
 
     if (strcmp(path, "/") == 0) {
-        filler(buf, "net", NULL, 0, 0);
+        filler(buf, "net", NULL, 0);
     }
     if (strcmp(path, "/net") == 0) {
         for(int i = 0; i < PATHARRLEN; i++) {
-            filler(buf, filenames[i], NULL, 0, 0);
+            filler(buf, filenames[i], NULL, 0);
         }
 
     }
@@ -277,7 +255,6 @@ static off_t procsys_lseek(const char *path, off_t off, int whence, struct fuse_
 }
 
 static const struct fuse_operations procsys_ops = {
-        .init       = procsys_init,
         .getattr	= procsys_getattr,
         .access		= procsys_access,
         .readlink	= procsys_readlink,
@@ -286,7 +263,6 @@ static const struct fuse_operations procsys_ops = {
         .read		= procsys_read,
         .statfs		= procsys_statfs,
         .release	= procsys_release,
-        .lseek		= procsys_lseek,
 };
 
 int main(int argc, char *argv[]) {
