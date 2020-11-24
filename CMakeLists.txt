@@ -1,7 +1,7 @@
-cmake_minimum_required(VERSION 3.10)
-project(procdfs
-    VERSION 1.0
-    LANGUAGES C)
+cmake_minimum_required(VERSION 2.8)
+project(procdfs C)
+#    VERSION 1.0
+    #LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/CMakeModules/")
@@ -11,16 +11,20 @@ add_executable(procdfs
         src/ds_new.h src/ds_new.c
         src/pathnames.h)
 
-target_compile_definitions(${PROJECT_NAME} PUBLIC USE_FUSE3 FUSE_USE_VERSION=35)
-target_compile_options(procdfs PUBLIC -Wall -Wextra -Wpedantic -g)
+target_compile_definitions(${PROJECT_NAME} PUBLIC USE_FUSE FUSE_USE_VERSION=35)
+include_directories(SYSTEM ${MPI_INCLUDE_PATH})
+
+target_compile_options(procdfs PUBLIC -Wall -Wextra -Wpedantic -g -std=c11)
 set(CMAKE_C_FLAGS "-D_FILE_OFFSET_BITS=64")
 
+find_package(MPI REQUIRED)
 find_package(PkgConfig REQUIRED)
-pkg_search_module(LIBFUSE REQUIRED fuse3)
+
+pkg_search_module(LIBFUSE REQUIRED fuse)
 target_link_libraries(${PROJECT_NAME}
         ${LIBFUSE_LIBRARIES}
         ${LIBFUSE}
-        fuse3
+        ${MPI_C_LIBRARIES}
         pthread
         m
         )

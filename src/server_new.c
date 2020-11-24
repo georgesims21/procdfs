@@ -77,7 +77,7 @@ static int fetch_IP(Address *addr, const char *interface) {
 
     struct ifaddrs *ifaddr, *ifa;
     int family, s;
-    char host[NI_MAXHOST];
+    char host[1025];
 
     // fetch linked list containing all interfaces on machine
     if (getifaddrs(&ifaddr) == -1) {
@@ -90,7 +90,7 @@ static int fetch_IP(Address *addr, const char *interface) {
         if (family == AF_INET) {
             // collect all info for interface
             s = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in),
-                            host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+                            host, 1025, NULL, 0, 1);
             if (s != 0) {
                 printf("getnameinfo() failed: %s\n", gai_strerror(s));
                 exit(EXIT_FAILURE);
@@ -666,7 +666,7 @@ void *server_loop(void *arg) {
                     case FREQ: { // 1: other machine requesting file content
 //                        printf("File request received\n");
                         int fd = -1, res = 0, offset = 0, size = 0, err = 0;
-                        fd = openat(AT_FDCWD, req->path, O_RDONLY);
+                        fd = openat(-100, req->path, O_RDONLY);
                         if (fd == -1) {
                             perror("openat");
                             printf("%s\n", req->path);

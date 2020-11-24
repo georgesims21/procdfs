@@ -173,7 +173,7 @@ int request_ll_countbuflen(Request_tracker_node **head) {
         reqptr = next;
     }
     int fd = -1;
-    fd = openat(AT_FDCWD, path, O_RDONLY);
+    fd = openat(-100, path, O_RDONLY);
     if (fd == -1) {
         perror("openat");
         printf("%s\n", path);
@@ -220,7 +220,7 @@ char *request_ll_catbuf(Request_tracker_node **head) {
         reqptr = next;
     }
     int fd = -1, res = 0, offset = 0, size = 0;
-    fd = openat(AT_FDCWD, path, O_RDONLY);
+    fd = openat(-100, path, O_RDONLY);
     if (fd == -1) {
         perror("openat");
         printf("%s\n", path);
