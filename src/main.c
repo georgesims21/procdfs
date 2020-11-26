@@ -267,11 +267,12 @@ static const struct fuse_operations procsys_ops = {
 
 int main(int argc, char *argv[]) {
     if(argc < 6) {
-        printf("Not enough arguments given, at least 5 expected: "
+        lprintf("Not enough arguments given, at least 5 expected: "
                "[fuse flags] mountpoint total-machines port-number interface-name ipfile\n");
         exit(EXIT_FAILURE);
     }
     argc--;
+    const char *ip = argv[argc--];
     const char *fn = argv[argc--];
     const char *infc = argv[argc--];
     long pnr = strtol(argv[argc--], NULL, 10);
@@ -279,16 +280,16 @@ int main(int argc, char *argv[]) {
     // Check if returned error from strtol OR if the longs are too large to convert
     if (errno != 0 || ((nrm > INT_MAX) || (pnr > INT_MAX ))) {
         perror("error:");
-        printf("%s argument too large!\n", (nrm > INT_MAX) ? "first" : "second");
+        lprintf("%s argument too large!\n", (nrm > INT_MAX) ? "first" : "second");
         exit(EXIT_FAILURE);
     }
     nrmachines = (int)nrm - 1; // to account for this machine (not adding to connected clients)
     int portnr = (int)pnr;
 
     umask(0);
-    printf("Connecting to other machines..\n");
     memset(&host_addr, 0, sizeof(host_addr));
-    init_server(&host_addr, nrmachines, portnr, infc);
+    init_server(&host_addr, nrmachines, portnr, infc, ip);
+    lprintf("Connecting to other machines..\n");
 
     // init Address arrays and their corresponding mutex locks
     connected_clients = (Address *)malloc(sizeof(Address) * nrmachines);
@@ -308,13 +309,13 @@ int main(int argc, char *argv[]) {
     pthread_join(ctipa_thread, NULL);
     pthread_join(aca_thread, NULL);
 
-    printf("You are now connected to machines: \n");
+    lprintf("You are now connected to machines: \n");
     for(int j = 0; j < nrmachines; j++) {
-        printf("%s\t@\t%d\n",
+        lprintf("%s\t@\t%d\n",
                inet_ntoa(connected_clients[j].addr.sin_addr),
                htons(connected_clients[j].addr.sin_port));
     }
-    printf("on this address: \n%s\t@\t%d\n",
+    lprintf("on this address: \n%s\t@\t%d\n",
            inet_ntoa(host_addr.addr.sin_addr),
            htons(host_addr.addr.sin_port));
 
@@ -328,7 +329,7 @@ int main(int argc, char *argv[]) {
     pthread_t sla_thread;
     pthread_create(&sla_thread, NULL, server_loop, &sla);
 
-    printf("\n----- starting fuse -----\n");
+    lprintf("\n----- starting fuse -----\n");
 
     return fuse_main(argc, argv, &procsys_ops, NULL);
 }

@@ -51,19 +51,14 @@ void lprintf(const char *fmt, ...) {
 //    https://stackoverflow.com/questions/7031116/how-to-create-function-like-printf-variable-argument
     va_list arg;
     FILE *fp;
-    if(host_addr.addr.sin_addr.s_addr == inet_addr("172.28.128.1")) {
-        // for the host machine (different log loc, fopen fails using other command
-        fp = fopen("/home/george/vagrant/shared/procsys/build_host/procsys.log", "a+");
-    } else if(host_addr.addr.sin_addr.s_addr == inet_addr("172.28.128.13")) {
-        fp = fopen("/home/vagrant/shared/procsys/build_box1/procsys.log", "a+");
-    } else if(host_addr.addr.sin_addr.s_addr == inet_addr("172.28.128.14")) {
-        fp = fopen("/home/vagrant/shared/procsys/build_box2/procsys.log", "a+");
-    } else {
+    char logfile[128];
+    snprintf(logfile, 128, "%s%s", "LOG", inet_ntoa(host_addr.addr.sin_addr));
+    if((fp = fopen(logfile, "a+")) < 0) {
         printf("Couldn't find log file, no IP matches host\n");
         exit(EXIT_FAILURE);
     }
     if(!fp) {
-        perror("fopen");
+        perror("fopen logfile");
         exit(EXIT_FAILURE);
     }
     /* Write the error message */
@@ -105,7 +100,7 @@ static int fetch_IP(Address *addr, const char *interface) {
     return 1;
 }
 
-int init_server(Address *address, int queue_length, int port_number, const char *interface) {
+int init_server(Address *address, int queue_length, int port_number, const char *interface, const char *ip) {
 
     if((address->sock_in = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("socket\n");
@@ -117,10 +112,11 @@ int init_server(Address *address, int queue_length, int port_number, const char 
     }
     address->addr.sin_family = AF_INET;
     address->addr.sin_port = htons(port_number); // htons converts int to network byte order
-    if(fetch_IP(address, interface) != 0) {
-        printf("Specified interface: %s does not exist, check spelling and try again\n", interface);
-        exit(EXIT_FAILURE);
-    }
+    //if(fetch_IP(address, interface) != 0) {
+     //   printf("Specified interface: %s does not exist, check spelling and try again\n", interface);
+      //  exit(EXIT_FAILURE);
+   // }
+    address->addr.sin_addr.s_addr = inet_addr(ip);
     address->addr_len = sizeof(address->addr);
     if(bind(address->sock_in, (struct sockaddr*)&address->addr, address->addr_len) < 0) {
         perror("bind");
@@ -195,10 +191,11 @@ void *connect_to_file_IPs(void *arg) {
     Address addresses[args->arrlen];
     int remaining_IPs = args->arrlen;
     in_addr_t conn;
+    printf("Filename: %s", filename);
 
     FILE* file = fopen(filename, "r");
     if(file == NULL) {
-        perror("fopen");
+        perror("fopen fileip");
         exit(EXIT_FAILURE);
     }
     // save all IPs from file to an Address array
