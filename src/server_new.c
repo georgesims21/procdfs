@@ -52,9 +52,9 @@ void lprintf(const char *fmt, ...) {
     va_list arg;
     FILE *fp;
     char logfile[128];
-    snprintf(logfile, 128, "%s%s", "LOG", inet_ntoa(host_addr.addr.sin_addr));
+    snprintf(logfile, 128, "%s%s", "/home/gss680/LOG", inet_ntoa(host_addr.addr.sin_addr));
     if((fp = fopen(logfile, "a+")) < 0) {
-        printf("Couldn't find log file, no IP matches host\n");
+        lprintf("Couldn't find log file, no IP matches host\n");
         exit(EXIT_FAILURE);
     }
     if(!fp) {
@@ -87,7 +87,7 @@ static int fetch_IP(Address *addr, const char *interface) {
             s = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in),
                             host, 1025, NULL, 0, 1);
             if (s != 0) {
-                printf("getnameinfo() failed: %s\n", gai_strerror(s));
+                lprintf("getnameinfo() failed: %s\n", gai_strerror(s));
                 exit(EXIT_FAILURE);
             }
             // if this interface matches the specified, save this IP address
@@ -174,7 +174,7 @@ static int pconnect(Address *addrarr, int arrlen, Address *newaddr) {
     }
     free = next_space(addrarr, arrlen);
     if(free < 0) {
-        printf("[thread: %ld] Maximum number of machines reached (%d), not adding!\n",
+        lprintf("[thread: %ld] Maximum number of machines reached (%d), not adding!\n",
                syscall(__NR_gettid), arrlen);
         exit(EXIT_FAILURE);
     }
@@ -191,7 +191,7 @@ void *connect_to_file_IPs(void *arg) {
     Address addresses[args->arrlen];
     int remaining_IPs = args->arrlen;
     in_addr_t conn;
-    printf("Filename: %s", filename);
+    lprintf("Filename: %s", filename);
 
     FILE* file = fopen(filename, "r");
     if(file == NULL) {
@@ -203,6 +203,7 @@ void *connect_to_file_IPs(void *arg) {
         if(strncmp(line, "\n", 1) == 0)
             continue;
         conn = inet_addr(line);
+        lprintf("extracted %s from list\n");
         // if host IP skip
         if(conn == args->host_addr.addr.sin_addr.s_addr) {
             continue;
@@ -258,7 +259,7 @@ static void paccept(Address host_addr, Address *client_addr) {
     client_addr->addr_len = sizeof(client_addr->addr);
 
     if(client_addr->sock_in != 0) {
-        printf("[thread: %ld ] sock_in is NOT 0 when accepting the connection!!\n", syscall(__NR_gettid));
+        lprintf("[thread: %ld ] sock_in is NOT 0 when accepting the connection!!\n", syscall(__NR_gettid));
     }
     if ((client_addr->sock_in = accept(host_addr.sock_in, (struct sockaddr *)&client_addr->addr,
                                        (socklen_t *)&client_addr->addr_len)) < 0) {
@@ -307,7 +308,7 @@ static void *new_connection(void *arg) {
         if(search_IPs(new_client.addr.sin_addr.s_addr, args->filename) == 0) {
             int free = next_space(args->conn_clients, args->arrlen);
             if(free < 0) {
-                printf("[thread: %ld ] Maximum number of machines reached (%d), exiting program..\n",
+                lprintf("[thread: %ld ] Maximum number of machines reached (%d), exiting program..\n",
                        syscall(__NR_gettid), args->arrlen);
                 exit(EXIT_FAILURE);
             }
@@ -340,7 +341,7 @@ void *accept_connection(void *arg) {
             pthread_join(nc_thread, NULL);
             remaining_conns--; // assumes that if wasn't added correctly then exited
         } else {
-            printf("Error on pfds poll\n");
+            lprintf("Error on pfds poll\n");
         }
     }
 }
@@ -372,7 +373,7 @@ int procsizefd(int fd) {
     int count = 0;
     if(fd < 1 ) {
         // file doesn't exist
-        printf("procsizefd fd < 1\n");
+        lprintf("procsizefd fd < 1\n");
         exit(EXIT_FAILURE);
     }
     while(read(fd, buf, 1) > 0) {
@@ -466,7 +467,7 @@ int extract_header(char **bufptr, int *char_count, Request *req, Address host_ad
     // check whether given hostIP matches actual
     if(inet_addr(hostIP) != host_addr.addr.sin_addr.s_addr ||
        htons(atoi(hostPort)) != host_addr.addr.sin_port) {
-        printf("Doesn't match the hostIP address and port, exiting...\n");
+        lprintf("Doesn't match the hostIP address and port, exiting...\n");
         exit(EXIT_FAILURE);
     }
     fetch_upto_delim(bufptr, aa_counter, char_count);
@@ -533,16 +534,18 @@ int create_send_msg(Request *req, int flag) {
 
     int err = 0;
     char *message = create_message(host_addr, req, HEADER, flag);
-//    printf("FREQ Sending: %s\n", message);
+//    lprintf("FREQ Sending: %s\n", message);
 
     if((err = send(req->sender.sock_out, message, strlen(message), 0)) <= 0) {
         if(err < 0) {
             perror("send");
+	    lprintf("send error");
+	    exit(1);
         }
-        printf("[thread: %ld ] write to host_client failed\n", syscall(__NR_gettid));
+        lprintf("[thread: %ld ] write to host_client failed\n", syscall(__NR_gettid));
     } else {
-//        printf("[thread: %ld ] sent %d bytes to %s @ sock_out: %d\n", syscall(__NR_gettid),
-//               err, inet_ntoa(req->sender.addr.sin_addr), req->sender.sock_out);
+        lprintf("[thread: %ld ] sent %d bytes to %s @ sock_out: %d\n", syscall(__NR_gettid),
+               err, inet_ntoa(req->sender.addr.sin_addr), req->sender.sock_out);
     }
     free(message);
     return 0;
@@ -582,8 +585,10 @@ Inprog *file_request(const char *path) {
     // create Inprog and lock for it - Inprog now contains ll of all requests sent to other machines
     pthread_mutex_lock(&inprog_tracker_lock);
     Inprog *inprog = inprog_create(path);
+    lprintf("after creating inprog\n");
     // add node to linked list with this Inprog
     inprog_tracker_ll_add(&inprog_tracker_head, inprog);
+    lprintf("after adding to tracker\n");
     pthread_mutex_unlock(&inprog_tracker_lock);
 
     pthread_mutex_lock(inprog->complete_lock);
@@ -591,6 +596,7 @@ Inprog *file_request(const char *path) {
         pthread_cond_wait(inprog->complete_cond, inprog->complete_lock);
     }
     pthread_mutex_unlock(inprog->complete_lock);
+    lprintf("after inprog is complete\n");
 
     return inprog;
 }
@@ -614,6 +620,7 @@ void *server_loop(void *arg) {
         }
         for(unsigned int i = 0; i < fdcount; i++) {
             if(pfds[i].revents & POLLIN) {
+	    lprintf("Incoming message");
                 // reading from already connected client
                 /*
                  * TODO
@@ -630,9 +637,9 @@ void *server_loop(void *arg) {
                 char *buf = calloc(1, sizeof(size_t) + 1);
                 if(!buf){calloc_error();};
                 int read_bytes = recv(pfds[i].fd, buf, sizeof(size_t), 0); // assuming we read 8 bytes and not less
-//                lprintf("Received %d bytes\n", read_bytes);
+                lprintf("Received %d bytes\n", read_bytes);
                 if(read_bytes <= 0) {
-                    printf("[thread: %ld ] disconnection, exiting..\n", syscall(__NR_gettid));
+                    lprintf("[thread: %ld ] disconnection, exiting..\n", syscall(__NR_gettid));
                     exit(EXIT_SUCCESS);
                 }
                 // break down first 8 bytes (size_t), collecting size and whatever is left -----
@@ -666,7 +673,7 @@ void *server_loop(void *arg) {
                         fd = openat(-100, req->path, O_RDONLY);
                         if (fd == -1) {
                             perror("openat");
-                            printf("%s\n", req->path);
+                            lprintf("%s\n", req->path);
                             exit (EXIT_FAILURE);
                         }
                         size = procsizefd(fd); // individually count chars in proc file - bottleneck for large fs
@@ -693,9 +700,9 @@ void *server_loop(void *arg) {
                             if(err < 0) {
                                 perror("send");
                             }
-                            printf("[thread: %ld] write to host_client failed\n", syscall(__NR_gettid));
+                            lprintf("[thread: %ld] write to host_client failed\n", syscall(__NR_gettid));
                         } else {
-//                            printf("[thread: %ld] sent %d bytes to %s @ sock_out: %d\n", syscall(__NR_gettid),
+//                            lprintf("[thread: %ld] sent %d bytes to %s @ sock_out: %d\n", syscall(__NR_gettid),
 //                                   err, inet_ntoa(req->sender.addr.sin_addr), req->sender.sock_out);
                         }
                         free(message);

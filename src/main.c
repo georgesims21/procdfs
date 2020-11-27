@@ -58,6 +58,8 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
      */
     (void)fi;
 
+	lprintf("getattrb\n");
+
     stbuf->st_gid = getgid();
     stbuf->st_uid = getuid();
     stbuf->st_atim.tv_sec = time(NULL);
@@ -72,7 +74,7 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
     } else {
         char pathbuf[MAXPATH] = {0};
         final_path(path, pathbuf);
-        printf("getattr called on (pathbuf): %s\n", pathbuf);
+        lprintf("getattr called on (pathbuf): %s\n", pathbuf);
         // files
         stbuf->st_mode = S_IFREG | 0444;
         stbuf->st_nlink = 1; // only located here, nowhere else yet
@@ -81,6 +83,7 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
         for(int i = 0; i < PATHARRLEN; i++) {
             if(strcmp(path, paths[i]) == 0) {
                 Inprog *inprog = file_request(pathbuf);
+                lprintf("after file_request\n");
                 size_t buflen = request_ll_countbuflen(&inprog->req_ll_head);
 //            inprog_tracker_ll_print(&inprog_tracker_head);
                 pthread_mutex_lock(&inprog_tracker_lock);
@@ -98,7 +101,7 @@ static int procsys_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                            off_t offset, struct fuse_file_info *fi) {
     (void)offset;
     (void)fi;
-    printf("readdir\n");
+    lprintf("readdir\n");
 
     filler( buf, ".", NULL, 0); // Current Directory
     filler( buf, "..", NULL, 0); // Parent Directory
@@ -118,7 +121,7 @@ static int procsys_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
                         struct fuse_file_info *fi) {
     (void)fi;
-    printf("\n\nreading file: %s\noffset: %ld\nsize: %lu\n", path, offset, size);
+    lprintf("\n\nreading file: %s\noffset: %ld\nsize: %lu\n", path, offset, size);
 
     for(int i = 0; i < PATHARRLEN; i++) {
         if(strcmp(path, paths[i]) == 0) {
@@ -288,7 +291,10 @@ int main(int argc, char *argv[]) {
 
     umask(0);
     memset(&host_addr, 0, sizeof(host_addr));
+    //host_addr.addr.sin_addr.s_addr = inet_addr(ip);
     init_server(&host_addr, nrmachines, portnr, infc, ip);
+    lprintf("ip: %s\nfilename: %s\ninterface name: %s\nportnr: %lu\n number of machines: %lu\n",
+		ip, fn, infc, pnr, nrm);
     lprintf("Connecting to other machines..\n");
 
     // init Address arrays and their corresponding mutex locks

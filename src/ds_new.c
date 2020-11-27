@@ -84,7 +84,7 @@ void req_tracker_ll_print(Request_tracker_node **head) {
 
     if(listptr != NULL) {
         while (listptr != NULL) {
-            printf("req_tracker_ll[%d]:\nAtomic counter: %llu\n"
+            lprintf("req_tracker_ll[%d]:\nAtomic counter: %llu\n"
                    "File path: %s\n"
                    "Sock_in: %d\n"
                    "Sock_out: %d\n"
@@ -108,7 +108,7 @@ void req_tracker_ll_print(Request_tracker_node **head) {
         }
         return;
     }
-    printf("List empty!\n");
+    lprintf("List empty!\n");
 }
 
 int request_ll_free(Request_tracker_node **head) {
@@ -116,7 +116,7 @@ int request_ll_free(Request_tracker_node **head) {
     Request_tracker_node *reqptr = *head;
     Request_tracker_node *next;
     if(reqptr == NULL) {
-        printf("The list is empty! Not freeing anything\n");
+        lprintf("The list is empty! Not freeing anything\n");
         return -1;
     }
     while(reqptr != NULL) {
@@ -136,7 +136,7 @@ int request_ll_complete(Request_tracker_node **head) {
     Request_tracker_node *next;
     int count = 0;
     if(reqptr == NULL) {
-        printf("The list is empty! Not freeing anything\n");
+        lprintf("The list is empty! Not freeing anything\n");
         return -1;
     }
     while(reqptr != NULL) {
@@ -156,7 +156,7 @@ int request_ll_countbuflen(Request_tracker_node **head) {
     Request_tracker_node *next;
     int count = 0;
     if(reqptr == NULL) {
-        printf("The list is empty!\n");
+        lprintf("The list is empty!\n");
         return 0;
     }
     char *path = reqptr->req->path;
@@ -165,7 +165,7 @@ int request_ll_countbuflen(Request_tracker_node **head) {
             if(reqptr->req->complete) {
                 count += reqptr->req->buflen;
             } else {
-                printf("Request not complete, exiting...\n");
+                lprintf("Request not complete, exiting...\n");
                 exit(EXIT_FAILURE);
             }
         }
@@ -176,7 +176,7 @@ int request_ll_countbuflen(Request_tracker_node **head) {
     fd = openat(-100, path, O_RDONLY);
     if (fd == -1) {
         perror("openat");
-        printf("%s\n", path);
+        lprintf("%s\n", path);
         exit (EXIT_FAILURE);
     }
     count += procsizefd(fd);
@@ -195,7 +195,7 @@ char *request_ll_catbuf(Request_tracker_node **head) {
     size_t count = 0, old_count = 0;
     char *filebuf = NULL;
     if(reqptr == NULL) {
-        printf("The list is empty!\n");
+        lprintf("The list is empty!\n");
         exit(EXIT_FAILURE);
     }
     char *path = reqptr->req->path;
@@ -212,7 +212,7 @@ char *request_ll_catbuf(Request_tracker_node **head) {
                 */
                 strncat(filebuf, reqptr->req->buf, reqptr->req->buflen);
             } else {
-                printf("Request not complete, exiting...\n");
+                lprintf("Request not complete, exiting...\n");
                 exit(EXIT_FAILURE);
             }
         }
@@ -223,7 +223,7 @@ char *request_ll_catbuf(Request_tracker_node **head) {
     fd = openat(-100, path, O_RDONLY);
     if (fd == -1) {
         perror("openat");
-        printf("%s\n", path);
+        lprintf("%s\n", path);
         exit (EXIT_FAILURE);
     }
     size = procsizefd(fd); // individually count chars in proc file - bottleneck for large fs
@@ -262,13 +262,13 @@ int inprog_add_buf(Request *req, Inprog *inprog, pthread_mutex_t *inprog_lock) {
         if(request_ll_complete(&inprog->req_ll_head) == inprog->messages_sent) {
             inprog->complete = true;
             pthread_cond_broadcast(inprog->complete_cond);
-            printf("All messages received!\n");
+            lprintf("All messages received!\n");
         }
         pthread_mutex_unlock(inprog->complete_lock);
 
 
     } else {
-        printf("Request not contained within the linked list, exiting...\n");
+        lprintf("Request not contained within the linked list, exiting...\n");
         exit(EXIT_FAILURE);
     }
     pthread_mutex_unlock(inprog_lock);
@@ -310,7 +310,7 @@ int inprog_tracker_ll_add(Inprog_tracker_node **head, Inprog *inprog) {
 void inprog_tracker_ll_print(Inprog_tracker_node **head) {
 
     if(head == NULL) {
-        printf("List empty!\n");
+        lprintf("List empty!\n");
         return;
     }
 
@@ -319,7 +319,7 @@ void inprog_tracker_ll_print(Inprog_tracker_node **head) {
 
     if(listptr != NULL) {
         while (listptr != NULL) {
-            printf("inprog_tracker_ll[%d]:\nAtomic counter: %llu\n"
+            lprintf("inprog_tracker_ll[%d]:\nAtomic counter: %llu\n"
                    "Complete: %d\n"
                    "Messages sent: %d\n"
                    "\n",
@@ -333,18 +333,18 @@ void inprog_tracker_ll_print(Inprog_tracker_node **head) {
         }
         return;
     }
-    printf("List empty!\n");
+    lprintf("List empty!\n");
 }
 
 Inprog_tracker_node *inprog_tracker_ll_fetch_req(Inprog_tracker_node **head, Request req) {
 
     Inprog_tracker_node *listptr = *head;
     if(head == NULL || listptr == NULL || strcmp(req.path, "") == 0) {
-        printf("List is empty/request is empty, exiting..\n");
+        lprintf("List is empty/request is empty, exiting..\n");
         exit(EXIT_FAILURE);
     }
     while(listptr != NULL) {
-        printf("checking atomic counter (inprog->ac): %llu\n", listptr->inprog->atomic_counter);
+        lprintf("checking atomic counter (inprog->ac): %llu\n", listptr->inprog->atomic_counter);
         if(listptr->inprog->atomic_counter == req.atomic_counter) {
             return listptr;
         }
@@ -354,14 +354,14 @@ Inprog_tracker_node *inprog_tracker_ll_fetch_req(Inprog_tracker_node **head, Req
             break;
         }
     }
-    printf("Cannot find request, exiting..\n");
+    lprintf("Cannot find request, exiting..\n");
     exit(EXIT_FAILURE);
 }
 
 Inprog_tracker_node *inprog_tracker_ll_fetch_node(Inprog_tracker_node **head, Inprog inprog) {
 
     if(head == NULL || inprog.req_ll_head == NULL) {
-        printf("List is empty/inprog list is empty, exiting..\n");
+        lprintf("List is empty/inprog list is empty, exiting..\n");
         exit(EXIT_FAILURE);
     }
     Inprog_tracker_node *listptr = *head;
@@ -375,7 +375,7 @@ Inprog_tracker_node *inprog_tracker_ll_fetch_node(Inprog_tracker_node **head, In
             break;
         }
     }
-    printf("Cannot find inprog, exiting..\n");
+    lprintf("Cannot find inprog, exiting..\n");
     exit(EXIT_FAILURE);
 }
 
@@ -384,10 +384,10 @@ int inprog_tracker_ll_remove(Inprog_tracker_node **head, Inprog inprog) {
     Inprog_tracker_node *reqptr = *head;
     Inprog_tracker_node *tmp;
     if(reqptr == NULL) {
-        printf("The list is empty! Not freeing anything\n");
+        lprintf("The list is empty! Not freeing anything\n");
         return -1;
     } else if (inprog.req_ll_head == NULL) {
-        printf("Empty Inprog, exiting..\n");
+        lprintf("Empty Inprog, exiting..\n");
         exit(EXIT_FAILURE);
     }
     if(reqptr->inprog->atomic_counter == inprog.atomic_counter && reqptr->next == NULL) {
