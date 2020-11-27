@@ -52,7 +52,7 @@ void lprintf(const char *fmt, ...) {
     va_list arg;
     FILE *fp;
     char logfile[128];
-    snprintf(logfile, 128, "%s%s", "/home/gss680/LOG", inet_ntoa(host_addr.addr.sin_addr));
+    snprintf(logfile, 128, "%s%s", "/home/george/vagrant/shared/procdfs/build_host/LOG", inet_ntoa(host_addr.addr.sin_addr));
     if((fp = fopen(logfile, "a+")) < 0) {
         lprintf("Couldn't find log file, no IP matches host\n");
         exit(EXIT_FAILURE);
@@ -191,7 +191,7 @@ void *connect_to_file_IPs(void *arg) {
     Address addresses[args->arrlen];
     int remaining_IPs = args->arrlen;
     in_addr_t conn;
-    lprintf("Filename: %s", filename);
+    lprintf("Filename: %s\n", filename);
 
     FILE* file = fopen(filename, "r");
     if(file == NULL) {
@@ -203,7 +203,7 @@ void *connect_to_file_IPs(void *arg) {
         if(strncmp(line, "\n", 1) == 0)
             continue;
         conn = inet_addr(line);
-        lprintf("extracted %s from list\n");
+        lprintf("extracted %s from list\n", line);
         // if host IP skip
         if(conn == args->host_addr.addr.sin_addr.s_addr) {
             continue;
