@@ -52,7 +52,7 @@ void lprintf(const char *fmt, ...) {
     va_list arg;
     FILE *fp;
     char logfile[128];
-    snprintf(logfile, 128, "%s%s", "/home/george/vagrant/shared/procdfs/build_host/LOG", inet_ntoa(host_addr.addr.sin_addr));
+    snprintf(logfile, 128, "%s%s", "/home/gss680/LOG", inet_ntoa(host_addr.addr.sin_addr));
     if((fp = fopen(logfile, "a+")) < 0) {
         lprintf("Couldn't find log file, no IP matches host\n");
         exit(EXIT_FAILURE);
@@ -190,33 +190,49 @@ void *connect_to_file_IPs(void *arg) {
     char line[31]; // 32 bits for ipv4 address
     Address addresses[args->arrlen];
     int remaining_IPs = args->arrlen;
-    in_addr_t conn;
-    lprintf("Filename: %s\n", filename);
 
     FILE* file = fopen(filename, "r");
     if(file == NULL) {
         perror("fopen fileip");
+	lprintf("fopen fileip error\n");
         exit(EXIT_FAILURE);
     }
-    // save all IPs from file to an Address array
+    // IPFILE:
+    // 10.149.0.55
+    // 10.149.0.54
+    //
+    // lets say this machine has IP: 10.149.0.54
+    //
+    lprintf("before starting connect loop\n");
     while(fgets(line, sizeof(line), file)) {
+        in_addr_t conn = 0; // for a sanity check
+        // skip empty line
         if(strncmp(line, "\n", 1) == 0)
             continue;
-        conn = inet_addr(line);
-        lprintf("extracted %s from list\n", line);
+        conn = inet_addr(line); // HERE conn == 10.149.0.55
+	char tmp[256] = {0};
+        lprintf("Extracted %s from list\nconn: %s\n", line, inet_ntop(AF_INET, &conn, tmp, 256)); // line = conn = 10.149.0.55 here
         // if host IP skip
         if(conn == args->host_addr.addr.sin_addr.s_addr) {
+	    lprintf("skipping IP\n");
             continue;
         }
-        Address new_addr = {0};
-        new_addr.addr.sin_addr.s_addr = conn;
-        new_addr.addr.sin_family = AF_INET;
-        new_addr.addr.sin_port = htons(1234);
-        new_addr.addr_len = sizeof(new_addr.addr);
-        addresses[args->arrlen - remaining_IPs] = new_addr;
+        Address *new_addr = (Address *) malloc(sizeof(Address));
+        lprintf("list == %s\nconn: %s\n", line, inet_ntop(AF_INET, &conn, tmp, 256)); // line = conn = 10.149.0.55 again
+	//memcpy(&new_addr.addr.sin_addr.s_addr, &conn, sizeof(conn));
+        new_addr->addr.sin_addr.s_addr = inet_addr(line); 
+	lprintf("adding: %s to new_addr array\n", inet_ntoa(new_addr->addr.sin_addr)); // NOW this new_addr IP == 10.149.0.54 ?!
+        new_addr->addr.sin_family = AF_INET;
+        new_addr->addr.sin_port = htons(1234);
+        new_addr->addr_len = sizeof(new_addr->addr);
+        addresses[args->arrlen - remaining_IPs] = *new_addr; // So here the wrong IP is added to my array!
+	free(new_addr);
         if((remaining_IPs--) < 0) {
             break;
         }
+    }
+    for(int ii = 0; ii < 2; ii++) {
+	lprintf("addresses[%d]: %s\n", ii, inet_ntoa(addresses[ii].addr.sin_addr));
     }
     remaining_IPs = args->arrlen;
     // attempt to connect to all Addresses in array, skip ones existing in conncli

@@ -292,9 +292,9 @@ int main(int argc, char *argv[]) {
     umask(0);
     memset(&host_addr, 0, sizeof(host_addr));
     host_addr.addr.sin_addr.s_addr = inet_addr(ip);
-    printf("ip: %s\nfilename: %s\ninterface name: %s\nportnr: %lu\nnumber of machines: %lu\n",
+    lprintf("ip: %s\nfilename: %s\ninterface name: %s\nportnr: %lu\nnumber of machines: %lu\n",
             ip, fn, infc, pnr, nrm);
-    printf("host_addr: %s", inet_ntoa(host_addr.addr.sin_addr));
+    lprintf("host_addr: %s", inet_ntoa(host_addr.addr.sin_addr));
     init_server(&host_addr, nrmachines, portnr, infc, ip);
     lprintf("ip: %s\nfilename: %s\ninterface name: %s\nportnr: %lu\nnumber of machines: %lu\n",
 		ip, fn, infc, pnr, nrm);
