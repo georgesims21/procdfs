@@ -190,6 +190,7 @@ void *connect_to_file_IPs(void *arg) {
     char line[31]; // 32 bits for ipv4 address
     Address addresses[args->arrlen];
     int remaining_IPs = args->arrlen;
+    in_addr_t conn; // for a sanity check
 
     FILE* file = fopen(filename, "r");
     if(file == NULL) {
@@ -205,28 +206,25 @@ void *connect_to_file_IPs(void *arg) {
     //
     lprintf("before starting connect loop\n");
     while(fgets(line, sizeof(line), file)) {
-        in_addr_t conn = 0; // for a sanity check
         // skip empty line
         if(strncmp(line, "\n", 1) == 0)
             continue;
         conn = inet_addr(line); // HERE conn == 10.149.0.55
 	char tmp[256] = {0};
-        lprintf("Extracted %s from list\nconn: %s\n", line, inet_ntop(AF_INET, &conn, tmp, 256)); // line = conn = 10.149.0.55 here
+        //lprintf("Extracted %s from list\nconn: %s\n", line, inet_ntop(AF_INET, &(conn.sin_addr), tmp, 256)); // line = conn = 10.149.0.55 here
         // if host IP skip
         if(conn == args->host_addr.addr.sin_addr.s_addr) {
 	    lprintf("skipping IP\n");
             continue;
         }
-        Address *new_addr = (Address *) malloc(sizeof(Address));
-        lprintf("list == %s\nconn: %s\n", line, inet_ntop(AF_INET, &conn, tmp, 256)); // line = conn = 10.149.0.55 again
-	//memcpy(&new_addr.addr.sin_addr.s_addr, &conn, sizeof(conn));
-        new_addr->addr.sin_addr.s_addr = inet_addr(line); 
-	lprintf("adding: %s to new_addr array\n", inet_ntoa(new_addr->addr.sin_addr)); // NOW this new_addr IP == 10.149.0.54 ?!
-        new_addr->addr.sin_family = AF_INET;
-        new_addr->addr.sin_port = htons(1234);
-        new_addr->addr_len = sizeof(new_addr->addr);
-        addresses[args->arrlen - remaining_IPs] = *new_addr; // So here the wrong IP is added to my array!
-	free(new_addr);
+        Address new_addr = {0};
+        //lprintf("list == %s\nconn: %s\n", line, inet_ntop(AF_INET, &(conn.sin_addr), tmp, 256)); // line = conn = 10.149.0.55 again
+        new_addr.addr.sin_addr.s_addr = conn;
+	//lprintf("adding: %s to new_addr array\n", inet_ntoa(new_addr->addr.sin_addr)); // NOW this new_addr IP == 10.149.0.54 ?!
+        new_addr.addr.sin_family = AF_INET;
+        new_addr.addr.sin_port = htons(1234);
+        new_addr.addr_len = sizeof(new_addr.addr);
+        addresses[args->arrlen - remaining_IPs] = new_addr; // So here the wrong IP is added to my array!
         if((remaining_IPs--) < 0) {
             break;
         }
