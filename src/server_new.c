@@ -166,6 +166,7 @@ static int pconnect(Address *addrarr, int arrlen, Address *newaddr) {
         close(newaddr->sock_out);
         return -1;
     }
+    lprintf("Connected to new socket_out: %d\n", newaddr->sock_out);
     if((location = contained_within(addrarr, *newaddr, arrlen)) != -1) {
         // if already inside it must be a response from a connected client
         if(addrarr[location].sock_out == 0)
@@ -195,16 +196,9 @@ void *connect_to_file_IPs(void *arg) {
     FILE* file = fopen(filename, "r");
     if(file == NULL) {
         perror("fopen fileip");
-	lprintf("fopen fileip error\n");
+        lprintf("fopen fileip error\n");
         exit(EXIT_FAILURE);
     }
-    // IPFILE:
-    // 10.149.0.55
-    // 10.149.0.54
-    //
-    // lets say this machine has IP: 10.149.0.54
-    //
-    lprintf("before starting connect loop\n");
     while(fgets(line, sizeof(line), file)) {
         // skip empty line
         if(strncmp(line, "\n", 1) == 0)
@@ -214,7 +208,7 @@ void *connect_to_file_IPs(void *arg) {
         //lprintf("Extracted %s from list\nconn: %s\n", line, inet_ntop(AF_INET, &(conn.sin_addr), tmp, 256)); // line = conn = 10.149.0.55 here
         // if host IP skip
         if(conn == args->host_addr.addr.sin_addr.s_addr) {
-	    lprintf("skipping IP\n");
+//            lprintf("skipping IP\n");
             continue;
         }
         Address new_addr = {0};
@@ -229,9 +223,9 @@ void *connect_to_file_IPs(void *arg) {
             break;
         }
     }
-    for(int ii = 0; ii < 2; ii++) {
-	lprintf("addresses[%d]: %s\n", ii, inet_ntoa(addresses[ii].addr.sin_addr));
-    }
+//    for(int ii = 0; ii < args->arrlen; ii++) {
+//        lprintf("addresses[%d]: %s\n", ii, inet_ntoa(addresses[ii].addr.sin_addr));
+//    }
     remaining_IPs = args->arrlen;
     // attempt to connect to all Addresses in array, skip ones existing in conncli
     while(remaining_IPs > 0) {
@@ -256,12 +250,12 @@ void *connect_to_file_IPs(void *arg) {
                 // not added due to already existing, array full or couldn't connect
             } else {
                 // pconnect handles adding sock_out if already exists
-                lprintf("Added by pconnect\n");
                 addresses[i].addr.sin_addr.s_addr = 0;
                 remaining_IPs--;
             }
             pthread_mutex_unlock(args->conn_clients_lock);
         }
+        lprintf("Trying again\n");
         sleep(1);
     }
     // check if conn is already located in conn_cli, if yes continue
@@ -282,6 +276,7 @@ static void paccept(Address host_addr, Address *client_addr) {
         exit(EXIT_FAILURE);
     }
     getsockname(client_addr->sock_in, (struct sockaddr *)&client_addr->addr, (socklen_t *)client_addr->addr_len);
+    lprintf("Accepted connection on sock_in: %d\n", client_addr->sock_in);
 }
 
 static int search_IPs(in_addr_t conn, const char *filename) {
@@ -554,8 +549,8 @@ int create_send_msg(Request *req, int flag) {
     if((err = send(req->sender.sock_out, message, strlen(message), 0)) <= 0) {
         if(err < 0) {
             perror("send");
-	    lprintf("send error");
-	    exit(1);
+            lprintf("send error");
+            exit(1);
         }
         lprintf("[thread: %ld ] write to host_client failed\n", syscall(__NR_gettid));
     } else {
@@ -635,16 +630,8 @@ void *server_loop(void *arg) {
         }
         for(unsigned int i = 0; i < fdcount; i++) {
             if(pfds[i].revents & POLLIN) {
-	    lprintf("Incoming message");
+            lprintf("Incoming message");
                 // reading from already connected client
-                /*
-                 * TODO
-                     * switch
-                         * 1: file request
-                             * (extra) make into void method
-                         * 2: content received
-                             * (extra) make into void method
-                 */
                 int counter = 0, flag = 0;
                 Request *req = (Request *)malloc(sizeof(Request));
                 if(!req){malloc_error();};

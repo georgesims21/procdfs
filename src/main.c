@@ -320,13 +320,16 @@ int main(int argc, char *argv[]) {
 
     lprintf("You are now connected to machines: \n");
     for(int j = 0; j < nrmachines; j++) {
-        lprintf("%s\t@\t%d\n",
+        lprintf("%s\t@\t%d\nsock_in: %d\tsock_out: %d\n",
                inet_ntoa(connected_clients[j].addr.sin_addr),
-               htons(connected_clients[j].addr.sin_port));
+               htons(connected_clients[j].addr.sin_port),
+               connected_clients[j].sock_in,
+               connected_clients[j].sock_out);
     }
-    lprintf("on this address: \n%s\t@\t%d\n",
+    lprintf("on this address: \n%s\t@\t%d\nsock_in: %d\n",
            inet_ntoa(host_addr.addr.sin_addr),
-           htons(host_addr.addr.sin_port));
+           htons(host_addr.addr.sin_port),
+           host_addr.sock_in);
 
     pthread_mutex_init(&connected_clients_lock, NULL);
     pthread_mutex_init(&inprog_tracker_lock, NULL);
