@@ -12,19 +12,19 @@ add_executable(procdfs
         src/pathnames.h)
 
 target_compile_definitions(${PROJECT_NAME} PUBLIC USE_FUSE FUSE_USE_VERSION=35)
-include_directories(SYSTEM ${MPI_INCLUDE_PATH})
+#include_directories(SYSTEM ${MPI_INCLUDE_PATH})
 
 target_compile_options(procdfs PUBLIC -Wall -Wextra -Wpedantic -g -std=c11)
 set(CMAKE_C_FLAGS "-D_FILE_OFFSET_BITS=64")
 
-find_package(MPI REQUIRED)
+#find_package(MPI REQUIRED)
 find_package(PkgConfig REQUIRED)
 
 pkg_search_module(LIBFUSE REQUIRED fuse)
 target_link_libraries(${PROJECT_NAME}
         ${LIBFUSE_LIBRARIES}
         ${LIBFUSE}
-        ${MPI_C_LIBRARIES}
+	#        ${MPI_C_LIBRARIES}
         pthread
         m
         )

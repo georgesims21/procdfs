@@ -52,7 +52,7 @@ void lprintf(const char *fmt, ...) {
     va_list arg;
     FILE *fp;
     char logfile[128];
-    snprintf(logfile, 128, "%s%s", "/home/gss680/LOG", inet_ntoa(host_addr.addr.sin_addr));
+    snprintf(logfile, 128, "%s%s", "/home/vagrant/LOG", inet_ntoa(host_addr.addr.sin_addr));
     if((fp = fopen(logfile, "a+")) < 0) {
         lprintf("Couldn't find log file, no IP matches host\n");
         exit(EXIT_FAILURE);
@@ -256,6 +256,7 @@ void *connect_to_file_IPs(void *arg) {
                 // not added due to already existing, array full or couldn't connect
             } else {
                 // pconnect handles adding sock_out if already exists
+                lprintf("Added by pconnect\n");
                 addresses[i].addr.sin_addr.s_addr = 0;
                 remaining_IPs--;
             }
