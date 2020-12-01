@@ -17,4 +17,4 @@ cmake ..
 make -j
 
 cd "$procdfs"
-./procdfs "/home/vagrant/$prog" 2 1234 enp0s8 "$proj/iplists/2client.txt" "$ip"
+./procdfs -d "/home/vagrant/$prog" 2 1234 enp0s8 "$proj/iplists/2client.txt" "$ip"

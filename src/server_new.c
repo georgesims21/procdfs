@@ -48,6 +48,7 @@ void final_path(const char *path, char *buf) {
 }
 
 void lprintf(const char *fmt, ...) {
+    return;
 //    https://stackoverflow.com/questions/7031116/how-to-create-function-like-printf-variable-argument
     va_list arg;
     FILE *fp;
