@@ -1,12 +1,8 @@
 /*
+ * 
  * Main skeleton taken from the libfuse example: passthrough.c
  */
 #define FUSE_USE_VERSION 35
-
-//#ifdef HAVE_CONFIG_H
-//#include <fuse3/config.h>
-//#endif
-
 #define _GNU_SOURCE
 
 #ifdef linux
@@ -27,6 +23,7 @@
 #include <limits.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <time.h>
 
 #ifdef __FreeBSD__
 #include <sys/socket.h>
@@ -269,6 +266,7 @@ static const struct fuse_operations procsys_ops = {
 };
 
 int main(int argc, char *argv[]) {
+
     if(argc < 6) {
         lprintf("Not enough arguments given, at least 5 expected: "
                "[fuse flags] mountpoint total-machines port-number interface-name ipfile\n");
