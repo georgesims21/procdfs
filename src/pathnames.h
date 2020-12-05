@@ -1,7 +1,7 @@
 #ifndef PROCSYS_PATHNAMES_H
 #define PROCSYS_PATHNAMES_H
 
-#define PATHARRLEN 21
+#define PATHARRLEN 20
 
 // As defined in: https://www.kernel.org/doc/Documentation/filesystems/proc.txt
 /* Table 1-8: IPv6 info in /proc/net
@@ -20,7 +20,7 @@
 /* Table 1-9: Network info in /proc/net
  * ..............................................................................
  */
-#define _PATH_PROCNET_ARP		"/net/arp"
+//#define _PATH_PROCNET_ARP		"/net/arp"
 #define _PATH_PROCNET_DEV		"/net/dev"
 #define _PATH_PROCNET_DEV_MCAST		"/net/dev_mcast"
 //#define _PATH_PROCNET_DEV_STAT		"/net/dev_stat"
@@ -55,7 +55,7 @@ const char filenames[PATHARRLEN][MAXPATH] = {
     "rt6_stats",
     "sockstat6",
     "snmp6",
-    "arp",
+//    "arp",
     "dev",
     "dev_mcast",
 //    "dev_stat",
@@ -91,7 +91,7 @@ const char paths[PATHARRLEN][MAXPATH] = {
     _PATH_PROCNET_RT6_STATS,
     _PATH_PROCNET_SOCKSTAT6,
     _PATH_PROCNET_SNMP6,
-    _PATH_PROCNET_ARP,
+//    _PATH_PROCNET_ARP,
     _PATH_PROCNET_DEV,
     _PATH_PROCNET_DEV_MCAST,
 //    _PATH_PROCNET_DEV_STAT,
