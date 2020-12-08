@@ -64,7 +64,7 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
 	lprintf("getattrb\n");
 
     start = clock();
-    for(int i = 0; i < N; i++) {
+    for(int ii = 0; ii < N; ii++) {
 
         stbuf->st_gid = getgid();
         stbuf->st_uid = getuid();
@@ -158,7 +158,7 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
     lprintf("\n\nreading file: %s\noffset: %ld\nsize: %lu\n", path, offset, size);
     clock_t start, end;
     double cpu_time_used;
-    int N = 15000;
+    int N = 1;
     char pathbuf[MAXPATH] = {0};
     final_path(path, pathbuf);
 
@@ -219,7 +219,7 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
     }
     end = clock();
     cpu_time_used = (((double) (end - start)) / CLOCKS_PER_SEC) / N;
-    bprintf("[%d machines] read() call on %s took: %f\n", nrmachines + 1, pathbuf, cpu_time_used);
+//    bprintf("[%d machines] read() call on %s took: %f\n", nrmachines + 1, pathbuf, cpu_time_used);
     for(int i = 0; i < PATHARRLEN; i++) {
         if(strcmp(path, paths[i]) == 0) {
             if(nrmachines == 0) {
@@ -242,11 +242,11 @@ static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
                 buflen = strlen(filebuf);
                 goto single_machine;
             }
-            char pathbuf[MAXPATH] = {0};
-            final_path(path, pathbuf);
+//            char pathbuf[MAXPATH] = {0};
+//            final_path(path, pathbuf);
             Inprog *inprog = file_request(pathbuf);
-            char *filebuf = request_ll_catbuf(&inprog->req_ll_head);
-            unsigned int buflen = strlen(filebuf);
+            filebuf = request_ll_catbuf(&inprog->req_ll_head);
+            buflen = strlen(filebuf);
             pthread_mutex_lock(&inprog_tracker_lock);
             // delete inprog from list
             inprog_tracker_ll_remove(&inprog_tracker_head, *inprog);
