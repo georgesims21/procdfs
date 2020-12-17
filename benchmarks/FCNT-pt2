@@ -1,0 +1,7 @@
+(2 machines)
+FCNT updating Inprog (without broadcasting on rt6_stats took 0.000001 seconds (0.000001 - 0.000000)
+FCNT updating Inprog (without broadcasting on raw6 took 0.000001 seconds (0.000001 - 0.000000)
+FCNT updating Inprog (without broadcasting on igmp took 0.000001 seconds (0.000001 - 0.000000)
+FCNT updating Inprog (without broadcasting on dev took 0.000001 seconds (0.000001 - 0.000000)
+FCNT updating Inprog (without broadcasting on udp6 N/A
+FCNT updating Inprog (without broadcasting on ipv6_route took 0.000001 seconds (0.000001 - 0.000000)

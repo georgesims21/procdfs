@@ -1,0 +1,24 @@
+
+(17:51:54) *with flag*
+IPLIST(3):
+-------
+10.149.0.58
+10.149.0.55
+10.149.0.57
+-------
+10.149.0.58:
+accept_conn() and connect_to_file_IPs() took 0.000307 seconds to execute
+
+(17:53:04) *without flag*
+IPLIST:
+-------
+10.149.0.58
+10.149.0.55
+10.149.0.57
+-------
+10.149.0.55:
+accept_conn() and connect_to_file_IPs() took 0.000292 seconds to execute
+10.149.0.58:
+accept_conn() and connect_to_file_IPs() took 0.000324 seconds to execute
+10.149.0.57:
+accept_conn() and connect_to_file_IPs() took 0.000324 seconds to execute

@@ -1,0 +1,52 @@
+
+(18:15:06) *with flag*
+IPLIST(8):
+-------
+10.149.0.66
+10.149.0.64
+10.149.0.55
+10.149.0.65
+10.149.0.61
+10.149.0.58
+10.149.0.57
+10.149.0.63
+-------
+10.149.0.57:
+accept_conn() and connect_to_file_IPs() took 0.000652 seconds to execute
+10.149.0.66:
+accept_conn() and connect_to_file_IPs() took 0.000709 seconds to execute
+10.149.0.55:
+accept_conn() and connect_to_file_IPs() took 0.000700 seconds to execute
+10.149.0.61:
+accept_conn() and connect_to_file_IPs() took 0.000701 seconds to execute
+10.149.0.63:
+accept_conn() and connect_to_file_IPs() took 0.000688 seconds to execute
+10.149.0.64:
+accept_conn() and connect_to_file_IPs() took 0.000722 seconds to execute
+10.149.0.58:
+accept_conn() and connect_to_file_IPs() took 0.000742 seconds to execute
+
+(18:16:22) *without flag*
+IPLIST:
+-------
+10.149.0.65
+10.149.0.58
+10.149.0.61
+10.149.0.64
+10.149.0.66
+10.149.0.55
+10.149.0.57
+10.149.0.63
+-------
+10.149.0.58:
+accept_conn() and connect_to_file_IPs() took 0.000680 seconds to execute
+10.149.0.55:
+accept_conn() and connect_to_file_IPs() took 0.000660 seconds to execute
+10.149.0.61:
+accept_conn() and connect_to_file_IPs() took 0.000698 seconds to execute
+10.149.0.63:
+accept_conn() and connect_to_file_IPs() took 0.000687 seconds to execute
+10.149.0.64:
+accept_conn() and connect_to_file_IPs() took 0.000719 seconds to execute
+10.149.0.66:
+accept_conn() and connect_to_file_IPs() took 0.000762 seconds to execute

@@ -1,0 +1,39 @@
+(2 machines)
+getattr() on rt6_stats took 0.000028 seconds
+getattr() on raw6 took 0.000075 seconds
+getattr() on igmp took 0.000127 seconds
+getattr() on dev took 0.000789 seconds
+getattr() on udp6 took 0.000995 seconds
+getattr() on ipv6_route took 0.001132 seconds
+(3 machines)
+getattr() on /home/gss680/10.149.0.58/rt6_stats-FREQ.txt took 0.000028 seconds
+getattr() on /home/gss680/10.149.0.59/rt6_stats-FREQ.txt took 0.000028 seconds
+getattr() on /home/gss680/10.149.0.58/raw6-FREQ.txt took 0.000075 seconds
+getattr() on /home/gss680/10.149.0.59/raw6-FREQ.txt took 0.000075 seconds
+getattr() on /home/gss680/10.149.0.59/igmp-FREQ.txt took 0.000128 seconds
+getattr() on /home/gss680/10.149.0.58/igmp-FREQ.txt took 0.000127 seconds
+getattr() on /home/gss680/10.149.0.58/dev-FREQ.txt took 0.000790 seconds
+getattr() on /home/gss680/10.149.0.59/dev-FREQ.txt took 0.000791 seconds
+getattr() on /home/gss680/10.149.0.59/udp6-FREQ.txt took 0.001000 seconds
+getattr() on /home/gss680/10.149.0.58/udp6-FREQ.txt took 0.000998 seconds
+getattr() on /home/gss680/10.149.0.59/ipv6_route-FREQ.txt took 0.001130 seconds
+getattr() on /home/gss680/10.149.0.58/ipv6_route-FREQ.txt took 0.001141 seconds
+(4 machines)
+getattr() on /home/gss680/10.149.0.59/rt6_stats-FREQ.txt took 0.000028 seconds
+getattr() on /home/gss680/10.149.0.60/rt6_stats-FREQ.txt took 0.000029 seconds
+getattr() on /home/gss680/10.149.0.58/rt6_stats-FREQ.txt took 0.000028 seconds
+getattr() on /home/gss680/10.149.0.59/raw6-FREQ.txt took 0.000075 seconds
+getattr() on /home/gss680/10.149.0.58/raw6-FREQ.txt took 0.000077 seconds
+getattr() on /home/gss680/10.149.0.60/raw6-FREQ.txt took 0.000078 seconds
+getattr() on /home/gss680/10.149.0.60/igmp-FREQ.txt took 0.000129 seconds
+getattr() on /home/gss680/10.149.0.59/igmp-FREQ.txt took 0.000127 seconds
+getattr() on /home/gss680/10.149.0.58/igmp-FREQ.txt took 0.000129 seconds
+getattr() on /home/gss680/10.149.0.60/dev-FREQ.txt took 0.000787 seconds
+getattr() on /home/gss680/10.149.0.59/dev-FREQ.txt took 0.000793 seconds
+getattr() on /home/gss680/10.149.0.58/dev-FREQ.txt took 0.000791 seconds
+getattr() on /home/gss680/10.149.0.58/udp6-FREQ.txt took 0.000999 seconds
+getattr() on /home/gss680/10.149.0.60/udp6-FREQ.txt took 0.000999 seconds
+getattr() on /home/gss680/10.149.0.59/udp6-FREQ.txt took 0.001000 seconds
+getattr() on /home/gss680/10.149.0.59/ipv6_route-FREQ.txt took 0.001137 seconds
+getattr() on /home/gss680/10.149.0.60/ipv6_route-FREQ.txt took 0.001137 seconds
+getattr() on /home/gss680/10.149.0.58/ipv6_route-FREQ.txt took 0.001151 seconds
