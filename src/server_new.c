@@ -709,6 +709,7 @@ void *server_loop(void *arg) {
 //                                   err, inet_ntoa(req->sender.addr.sin_addr), req->sender.sock_out);
                         }
                         free(message);
+                        close(fd);
                         break;
                     }
                     case FCNT: // 2: this machine receiving a response with content
