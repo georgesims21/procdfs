@@ -1,7 +1,3 @@
-#include "ds_new.h"
-#include "log.h"
-#include "server_new.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,6 +6,9 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <fcntl.h>
+
+#include "ds_new.h"
+#include "server_new.h"
 
 int req_tracker_ll_add(Request_tracker_node **head, Request *req) {
 
@@ -48,8 +47,8 @@ int request_cmp(Request req1, Request req2) {
 }
 
 int req_add_content(Request_tracker_node **head, Request req, char *cnt, int cntlen) {
-    // assumes user gave size INCLUDING '\0'
 
+    // assumes user gave size INCLUDING '\0'
     Request_tracker_node *node = req_tracker_ll_fetch(head, req);
     if(node == NULL)
         return -1;
@@ -81,7 +80,6 @@ void req_tracker_ll_print(Request_tracker_node **head) {
 
     int count = 0;
     Request_tracker_node *listptr = *head;
-
     if(listptr != NULL) {
         while (listptr != NULL) {
             printf("req_tracker_ll[%d]:\nAtomic counter: %llu\n"
@@ -108,7 +106,6 @@ void req_tracker_ll_print(Request_tracker_node **head) {
         }
         return;
     }
-    printf("List empty!\n");
 }
 
 int request_ll_free(Request_tracker_node **head) {
@@ -185,11 +182,11 @@ int request_ll_countbuflen(Request_tracker_node **head) {
 }
 
 char *request_ll_catbuf(Request_tracker_node **head) {
+
     /*
      * https://en.wikipedia.org/wiki/Joel_Spolsky#Schlemiel_the_Painter's_algorithm
      */
     // doesn't check filebuf for non-NULL etc
-
     Request_tracker_node *reqptr = *head;
     Request_tracker_node *next;
     size_t count = 0, old_count = 0;
@@ -206,10 +203,6 @@ char *request_ll_catbuf(Request_tracker_node **head) {
                 count += reqptr->req->buflen;
                 filebuf = realloc(filebuf, count);
                 memset(&filebuf[old_count], 0, reqptr->req->buflen);
-                /* TODO
-                     * be precise with strncat using size or address to avoid the
-                     painters problem/algo
-                */
                 strncat(filebuf, reqptr->req->buf, reqptr->req->buflen);
             } else {
                 printf("Request not complete, exiting...\n");
@@ -265,8 +258,6 @@ int inprog_add_buf(Request *req, Inprog *inprog, pthread_mutex_t *inprog_lock) {
             printf("All messages received!\n");
         }
         pthread_mutex_unlock(inprog->complete_lock);
-
-
     } else {
         printf("Request not contained within the linked list, exiting...\n");
         exit(EXIT_FAILURE);
@@ -313,7 +304,6 @@ void inprog_tracker_ll_print(Inprog_tracker_node **head) {
         printf("List empty!\n");
         return;
     }
-
     int count = 0;
     Inprog_tracker_node *listptr = *head;
 

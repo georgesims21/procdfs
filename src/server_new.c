@@ -1,6 +1,5 @@
 #include <arpa/inet.h>
 #include <pwd.h>
-#include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,20 +7,13 @@
 #include <netinet/in.h>
 #include <ifaddrs.h>
 #include <netdb.h>
-#include <errno.h>
-#include <limits.h>
 #include <pthread.h>
 #include <unistd.h>
 #include <poll.h>
-#include <time.h>
-#include <sys/time.h>
-#include <math.h>
 #include <sys/types.h>
 #include <sys/syscall.h>
 #include <fcntl.h>
-#include <stdarg.h>
 
-#include "log.h"
 #include "server_new.h"
 #include "ds_new.h"
 
@@ -47,34 +39,11 @@ void final_path(const char *path, char *buf) {
     free(tmp);
 }
 
-//void lprintf(const char *fmt, ...) {
-//    return;
-////    https://stackoverflow.com/questions/7031116/how-to-create-function-like-printf-variable-argument
-//    va_list arg;
-//    FILE *fp;
-//    char logfile[128];
-//    snprintf(logfile, 128, "%s%s", "/home/vagrant/LOG", inet_ntoa(host_addr.addr.sin_addr));
-//    if((fp = fopen(logfile, "a+")) < 0) {
-//        lprintf("Couldn't find log file, no IP matches host\n");
-//        exit(EXIT_FAILURE);
-//    }
-//    if(!fp) {
-//        perror("fopen logfile");
-//        exit(EXIT_FAILURE);
-//    }
-//    /* Write the error message */
-//    va_start(arg, fmt);
-//    vfprintf(fp, fmt, arg);
-//    va_end(arg);
-//    fclose(fp);
-//}
-
 static int fetch_IP(Address *addr, const char *interface) {
 
     struct ifaddrs *ifaddr, *ifa;
     int family, s;
     char host[1025];
-
     // fetch linked list containing all interfaces on machine
     if (getifaddrs(&ifaddr) == -1) {
         perror("getifaddrs");
@@ -141,6 +110,7 @@ static int contained_within(Address *addr, Address lookup, int arrlen) {
 }
 
 static int next_space(Address *addr, int arrlen) {
+
     // assumes user has locked addr
     int i = 0;
     Address *ptr = addr; // Address array
@@ -158,7 +128,6 @@ static int pconnect(Address *addrarr, int arrlen, Address *newaddr) {
     int free = 0;
     newaddr->addr.sin_port = htons(1234); // using generic port here, find solution
     int location = 0;
-
     if((newaddr->sock_out = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("socket\n");
         exit(EXIT_FAILURE);
@@ -179,7 +148,6 @@ static int pconnect(Address *addrarr, int arrlen, Address *newaddr) {
                syscall(__NR_gettid), arrlen);
         exit(EXIT_FAILURE);
     }
-
     addrarr[free] = *newaddr;
     return 0;
 }
@@ -192,7 +160,6 @@ void *connect_to_file_IPs(void *arg) {
     Address addresses[args->arrlen];
     int remaining_IPs = args->arrlen;
     in_addr_t conn; // for a sanity check
-
     FILE* file = fopen(filename, "r");
     if(file == NULL) {
         perror("fopen fileip, check if given ip file exists");
@@ -258,7 +225,6 @@ void *connect_to_file_IPs(void *arg) {
 static void paccept(Address host_addr, Address *client_addr) {
 
     client_addr->addr_len = sizeof(client_addr->addr);
-
     if(client_addr->sock_in != 0) {
         printf("[thread: %ld ] sock_in is NOT 0 when accepting the connection!\n", syscall(__NR_gettid));
     }
@@ -297,7 +263,6 @@ static void *new_connection(void *arg) {
     int loc = 0;
     Address new_client;
     memset(&new_client, 0, sizeof(Address));
-
     pthread_mutex_lock(args->conn_clients_lock);
     paccept(args->host_addr, &new_client);
     new_client.addr.sin_port = htons(1234);
@@ -457,7 +422,6 @@ int extract_header(char **bufptr, int *char_count, Request *req, Address host_ad
     char hostPort[16] = {0};
     char aa_counter[8] = {0};
     char path[MAXPATH] = {0};
-
     fetch_upto_delim(bufptr, senderIP, char_count);
     fetch_upto_delim(bufptr, senderPort, char_count);
     fetch_upto_delim(bufptr, hostIP, char_count);
@@ -548,7 +512,6 @@ Inprog *inprog_create(const char *path) {
 
     Inprog *inprog = (Inprog *)malloc(sizeof(Inprog));
     if(!inprog){malloc_error();};
-
     memset(inprog, 0, sizeof(Inprog));
     inprog->complete = false;
     pthread_mutex_lock(&a_counter_lock);
@@ -699,7 +662,7 @@ void *server_loop(void *arg) {
                         break;
                 }
                 free(req);
-                free(buf); // -- culprit to seg fault
+                free(buf);
                 free(contentbuf);
             }
         } // END of poll loop

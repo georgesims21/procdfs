@@ -114,7 +114,7 @@ def main():
     proc_wc_time = wc_loop(cmds.get("proc"), nriterations)
     print("100%.. writing to file")
 
-    with open("/home/george/github/procdfs/benchmarks/test.txt", "a") as fp:
+    with open("/benchmarks/test.txt", "a") as fp:
         fp.write(f"[{nrmachines}]\nprom | sys-time: {prom_sys_time}\twall-time: {prom_wc_time}\n"
                      f"proc | sys-time: {proc_sys_time}\twall-time: {proc_wc_time}\n")
 

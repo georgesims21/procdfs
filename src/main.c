@@ -1,5 +1,4 @@
 /*
- * 
  * Main skeleton taken from the libfuse example: passthrough.c
  */
 #define FUSE_USE_VERSION 35
@@ -32,7 +31,6 @@
 #include <sys/xattr.h>
 #endif
 
-#include "log.h"
 #include "writer.h"
 #include "ds_new.h"
 #include "server_new.h"
@@ -49,6 +47,7 @@ pthread_mutex_t a_counter_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static int procsys_getattr(const char *path, struct stat *stbuf,
                        struct fuse_file_info *fi) {
+
     (void)fi;
     char pathbuf[MAXPATH] = {0};
     stbuf->st_gid = getgid();
@@ -105,6 +104,7 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
 
 static int procsys_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                            off_t offset, struct fuse_file_info *fi) {
+
     (void)offset;
     (void)fi;
 
@@ -125,6 +125,7 @@ static int procsys_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 static int procsys_read(const char *path, char *buf, size_t size, off_t offset,
                         struct fuse_file_info *fi) {
+
     (void)fi;
     unsigned int buflen;
     char *filebuf;
