@@ -47,27 +47,27 @@ void final_path(const char *path, char *buf) {
     free(tmp);
 }
 
-void lprintf(const char *fmt, ...) {
-    return;
-//    https://stackoverflow.com/questions/7031116/how-to-create-function-like-printf-variable-argument
-    va_list arg;
-    FILE *fp;
-    char logfile[128];
-    snprintf(logfile, 128, "%s%s", "/home/vagrant/LOG", inet_ntoa(host_addr.addr.sin_addr));
-    if((fp = fopen(logfile, "a+")) < 0) {
-        lprintf("Couldn't find log file, no IP matches host\n");
-        exit(EXIT_FAILURE);
-    }
-    if(!fp) {
-        perror("fopen logfile");
-        exit(EXIT_FAILURE);
-    }
-    /* Write the error message */
-    va_start(arg, fmt);
-    vfprintf(fp, fmt, arg);
-    va_end(arg);
-    fclose(fp);
-}
+//void lprintf(const char *fmt, ...) {
+//    return;
+////    https://stackoverflow.com/questions/7031116/how-to-create-function-like-printf-variable-argument
+//    va_list arg;
+//    FILE *fp;
+//    char logfile[128];
+//    snprintf(logfile, 128, "%s%s", "/home/vagrant/LOG", inet_ntoa(host_addr.addr.sin_addr));
+//    if((fp = fopen(logfile, "a+")) < 0) {
+//        lprintf("Couldn't find log file, no IP matches host\n");
+//        exit(EXIT_FAILURE);
+//    }
+//    if(!fp) {
+//        perror("fopen logfile");
+//        exit(EXIT_FAILURE);
+//    }
+//    /* Write the error message */
+//    va_start(arg, fmt);
+//    vfprintf(fp, fmt, arg);
+//    va_end(arg);
+//    fclose(fp);
+//}
 
 static int fetch_IP(Address *addr, const char *interface) {
 
@@ -88,7 +88,7 @@ static int fetch_IP(Address *addr, const char *interface) {
             s = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in),
                             host, 1025, NULL, 0, 1);
             if (s != 0) {
-                lprintf("getnameinfo() failed: %s\n", gai_strerror(s));
+                printf("getnameinfo() failed: %s\n", gai_strerror(s));
                 exit(EXIT_FAILURE);
             }
             // if this interface matches the specified, save this IP address
@@ -167,7 +167,6 @@ static int pconnect(Address *addrarr, int arrlen, Address *newaddr) {
         close(newaddr->sock_out);
         return -1;
     }
-    lprintf("Connected to new socket_out: %d\n", newaddr->sock_out);
     if((location = contained_within(addrarr, *newaddr, arrlen)) != -1) {
         // if already inside it must be a response from a connected client
         if(addrarr[location].sock_out == 0)
@@ -176,7 +175,7 @@ static int pconnect(Address *addrarr, int arrlen, Address *newaddr) {
     }
     free = next_space(addrarr, arrlen);
     if(free < 0) {
-        lprintf("[thread: %ld] Maximum number of machines reached (%d), not adding!\n",
+        printf("[thread: %ld] Maximum number of machines reached (%d), not adding!\n",
                syscall(__NR_gettid), arrlen);
         exit(EXIT_FAILURE);
     }
@@ -196,37 +195,30 @@ void *connect_to_file_IPs(void *arg) {
 
     FILE* file = fopen(filename, "r");
     if(file == NULL) {
-        perror("fopen fileip");
-        lprintf("fopen fileip error\n");
+        perror("fopen fileip, check if given ip file exists");
+        printf("fopen fileip error\n");
         exit(EXIT_FAILURE);
     }
     while(fgets(line, sizeof(line), file)) {
         // skip empty line
         if(strncmp(line, "\n", 1) == 0)
             continue;
-        conn = inet_addr(line); // HERE conn == 10.149.0.55
-	char tmp[256] = {0};
-        //lprintf("Extracted %s from list\nconn: %s\n", line, inet_ntop(AF_INET, &(conn.sin_addr), tmp, 256)); // line = conn = 10.149.0.55 here
+        conn = inet_addr(line);
+        char tmp[256] = {0};
         // if host IP skip
         if(conn == args->host_addr.addr.sin_addr.s_addr) {
-//            lprintf("skipping IP\n");
             continue;
         }
         Address new_addr = {0};
-        //lprintf("list == %s\nconn: %s\n", line, inet_ntop(AF_INET, &(conn.sin_addr), tmp, 256)); // line = conn = 10.149.0.55 again
         new_addr.addr.sin_addr.s_addr = conn;
-	//lprintf("adding: %s to new_addr array\n", inet_ntoa(new_addr->addr.sin_addr)); // NOW this new_addr IP == 10.149.0.54 ?!
         new_addr.addr.sin_family = AF_INET;
         new_addr.addr.sin_port = htons(1234);
         new_addr.addr_len = sizeof(new_addr.addr);
-        addresses[args->arrlen - remaining_IPs] = new_addr; // So here the wrong IP is added to my array!
+        addresses[args->arrlen - remaining_IPs] = new_addr;
         if((remaining_IPs--) < 0) {
             break;
         }
     }
-//    for(int ii = 0; ii < args->arrlen; ii++) {
-//        lprintf("addresses[%d]: %s\n", ii, inet_ntoa(addresses[ii].addr.sin_addr));
-//    }
     remaining_IPs = args->arrlen;
     // attempt to connect to all Addresses in array, skip ones existing in conncli
     while(remaining_IPs > 0) {
@@ -256,8 +248,7 @@ void *connect_to_file_IPs(void *arg) {
             }
             pthread_mutex_unlock(args->conn_clients_lock);
         }
-        lprintf("Trying again\n");
-        sleep(1);
+//        sleep(1); // allows setup of other machines without using CPU as much
     }
     // check if conn is already located in conn_cli, if yes continue
     fclose(file);
@@ -269,7 +260,7 @@ static void paccept(Address host_addr, Address *client_addr) {
     client_addr->addr_len = sizeof(client_addr->addr);
 
     if(client_addr->sock_in != 0) {
-        lprintf("[thread: %ld ] sock_in is NOT 0 when accepting the connection!!\n", syscall(__NR_gettid));
+        printf("[thread: %ld ] sock_in is NOT 0 when accepting the connection!\n", syscall(__NR_gettid));
     }
     if ((client_addr->sock_in = accept(host_addr.sock_in, (struct sockaddr *)&client_addr->addr,
                                        (socklen_t *)&client_addr->addr_len)) < 0) {
@@ -277,7 +268,6 @@ static void paccept(Address host_addr, Address *client_addr) {
         exit(EXIT_FAILURE);
     }
     getsockname(client_addr->sock_in, (struct sockaddr *)&client_addr->addr, (socklen_t *)client_addr->addr_len);
-    lprintf("Accepted connection on sock_in: %d\n", client_addr->sock_in);
 }
 
 static int search_IPs(in_addr_t conn, const char *filename) {
@@ -319,7 +309,7 @@ static void *new_connection(void *arg) {
         if(search_IPs(new_client.addr.sin_addr.s_addr, args->filename) == 0) {
             int free = next_space(args->conn_clients, args->arrlen);
             if(free < 0) {
-                lprintf("[thread: %ld ] Maximum number of machines reached (%d), exiting program..\n",
+                printf("[thread: %ld ] Maximum number of machines reached (%d), exiting program..\n",
                        syscall(__NR_gettid), args->arrlen);
                 exit(EXIT_FAILURE);
             }
@@ -337,7 +327,6 @@ void *accept_connection(void *arg) {
     int remaining_conns = args->arrlen, pollcnt = 0;
     pfds.fd = args->host_addr.sock_in;
     pfds.events = POLLIN;
-
     while(remaining_conns > 0) {
         if((pollcnt = poll(&pfds, 1, -1)) < 0) { // have 3 sec timeout if doesn't work
             perror("poll");
@@ -352,7 +341,7 @@ void *accept_connection(void *arg) {
             pthread_join(nc_thread, NULL);
             remaining_conns--; // assumes that if wasn't added correctly then exited
         } else {
-            lprintf("Error on pfds poll\n");
+            printf("Error on pfds poll\n");
         }
     }
 }
@@ -372,6 +361,7 @@ static int contained_within_ret(Address *addr, Address *lookup, int arrlen) {
 }
 
 int parse_flag(char *buf) {
+
     // ASCII magic: https://stackoverflow.com/questions/5029840/convert-char-to-int-in-c-and-c
     int flag = buf[0] - '0';
     memmove(buf, buf + 2, strlen(buf));
@@ -384,7 +374,7 @@ int procsizefd(int fd) {
     int count = 0;
     if(fd < 1 ) {
         // file doesn't exist
-        lprintf("procsizefd fd < 1\n");
+        printf("procsizefd fd < 1\n");
         exit(EXIT_FAILURE);
     }
     while(read(fd, buf, 1) > 0) {
@@ -472,19 +462,14 @@ int extract_header(char **bufptr, int *char_count, Request *req, Address host_ad
     fetch_upto_delim(bufptr, senderPort, char_count);
     fetch_upto_delim(bufptr, hostIP, char_count);
     fetch_upto_delim(bufptr, hostPort, char_count);
-
-//    printf("senderIP: %s\nsenderPort: %s\nhostIP: %s\nhostPort: %s\n",
-//            senderIP, senderPort, hostIP, hostPort);
     // check whether given hostIP matches actual
     if(inet_addr(hostIP) != host_addr.addr.sin_addr.s_addr ||
        htons(atoi(hostPort)) != host_addr.addr.sin_port) {
-        lprintf("Doesn't match the hostIP address and port, exiting...\n");
+        printf("Doesn't match the hostIP address and port, exiting...\n");
         exit(EXIT_FAILURE);
     }
     fetch_upto_delim(bufptr, aa_counter, char_count);
     fetch_upto_delim(bufptr, path, char_count);
-//    printf("aa_counter: %s\npath: %s\n", aa_counter, path);
-
     req->sender.addr.sin_addr.s_addr = inet_addr(senderIP);
     req->sender.addr.sin_port = htons(atoi(senderPort));
     req->atomic_counter = strtoll(aa_counter, NULL, 10);
@@ -529,7 +514,6 @@ Request *req_create(Address sender, long long counter, const char *path) {
     req->atomic_counter = counter;
     snprintf(req->path, MAXPATH, "%s", path);
     return req;
-
 }
 
 int add_inprog(Inprog *inprog, Request *req) {
@@ -545,17 +529,15 @@ int create_send_msg(Request *req, int flag) {
 
     int err = 0;
     char *message = create_message(host_addr, req, HEADER, flag);
-//    lprintf("FREQ Sending: %s\n", message);
-
     if((err = send(req->sender.sock_out, message, strlen(message), 0)) <= 0) {
         if(err < 0) {
             perror("send");
-            lprintf("send error");
+            printf("send error");
             exit(1);
         }
-        lprintf("[thread: %ld ] write to host_client failed\n", syscall(__NR_gettid));
+        printf("[thread: %ld ] write to host_client failed\n", syscall(__NR_gettid));
     } else {
-        lprintf("[thread: %ld ] sent %d bytes to %s @ sock_out: %d\n", syscall(__NR_gettid),
+        printf("[thread: %ld ] sent %d bytes to %s @ sock_out: %d\n", syscall(__NR_gettid),
                err, inet_ntoa(req->sender.addr.sin_addr), req->sender.sock_out);
     }
     free(message);
@@ -596,19 +578,14 @@ Inprog *file_request(const char *path) {
     // create Inprog and lock for it - Inprog now contains ll of all requests sent to other machines
     pthread_mutex_lock(&inprog_tracker_lock);
     Inprog *inprog = inprog_create(path);
-    lprintf("after creating inprog\n");
     // add node to linked list with this Inprog
     inprog_tracker_ll_add(&inprog_tracker_head, inprog);
-    lprintf("after adding to tracker\n");
     pthread_mutex_unlock(&inprog_tracker_lock);
-
     pthread_mutex_lock(inprog->complete_lock);
     while(!inprog->complete) {
         pthread_cond_wait(inprog->complete_cond, inprog->complete_lock);
     }
     pthread_mutex_unlock(inprog->complete_lock);
-    lprintf("after inprog is complete\n");
-
     return inprog;
 }
 
@@ -631,7 +608,6 @@ void *server_loop(void *arg) {
         }
         for(unsigned int i = 0; i < fdcount; i++) {
             if(pfds[i].revents & POLLIN) {
-            lprintf("Incoming message");
                 // reading from already connected client
                 int counter = 0, flag = 0;
                 Request *req = (Request *)malloc(sizeof(Request));
@@ -640,9 +616,8 @@ void *server_loop(void *arg) {
                 char *buf = calloc(1, sizeof(size_t) + 1);
                 if(!buf){calloc_error();};
                 int read_bytes = recv(pfds[i].fd, buf, sizeof(size_t), 0); // assuming we read 8 bytes and not less
-                lprintf("Received %d bytes\n", read_bytes);
                 if(read_bytes <= 0) {
-                    lprintf("[thread: %ld ] disconnection, exiting..\n", syscall(__NR_gettid));
+                    printf("[thread: %ld ] disconnection, exiting..\n", syscall(__NR_gettid));
                     exit(EXIT_SUCCESS);
                 }
                 // break down first 8 bytes (size_t), collecting size and whatever is left -----
@@ -654,7 +629,6 @@ void *server_loop(void *arg) {
                 // save after '-' into tmp
                 char *contentbuf = calloc(total + 1, sizeof(char));
                 if(!contentbuf){calloc_error();};
-//                memset(contentbuf, 0, sizeof(char) * total + 1);
                 char *e_ptr = contentbuf;
                 strncpy(contentbuf, &buf[counter], read_bytes - counter + 1);
                 int rem_bytes = total - read_bytes + counter; // already read 8 bytes, but size not included in total
@@ -664,26 +638,21 @@ void *server_loop(void *arg) {
                     rem_bytes -= recv(pfds[i].fd, buf, rem_bytes, 0);
                     strcat(contentbuf, buf);
                 }
-//                lprintf("[thread: %ld {%s}] (%d) bytes received: %s\n", syscall(__NR_gettid), tb,
-//                       total, contentbuf);
                 // get everything from rest of buffer and save into request
                 extract_buffer(&e_ptr, &char_count, req, args->host_addr, args->conn_clients,
                                args->conn_clients_lock, &flag, args->arrlen);
                 switch(flag) {
                     case FREQ: { // 1: other machine requesting file content
-//                        printf("File request received\n");
                         int fd = -1, res = 0, offset = 0, size = 0, err = 0;
                         fd = openat(-100, req->path, O_RDONLY);
                         if (fd == -1) {
                             perror("openat");
-                            lprintf("%s\n", req->path);
+                            printf("%s\n", req->path);
                             exit (EXIT_FAILURE);
                         }
                         size = procsizefd(fd); // individually count chars in proc file - bottleneck for large fs
                         char *procbuf = malloc(sizeof(char) * size);
                         if(!procbuf){malloc_error();};
-//                        lprintf("procsize: %d\n", size);
-
                         res = pread(fd, procbuf, size, offset);
                         if (res == -1) {
                             perror("pread");
@@ -694,31 +663,20 @@ void *server_loop(void *arg) {
                         if(!req){realloc_error();};
                         memset(req->buf, 0, sizeof(req->buflen));
                         snprintf(req->buf, req->buflen, "%s", procbuf);
-//                        printf("\n\nProcbuf: %p\n\n", (void*)&procbuf);
                         free(procbuf); // -- culprit to seg fault
                         // send the req back to the sender (should use new create_and_send_msg method)
                         char *message = create_message(args->host_addr, req, HEADER, FCNT);
-//                        printf("FCNT Sending: %s\n", message);
                         if((err = send(req->sender.sock_out, message, strlen(message) + 1, 0)) <= 0) {
                             if(err < 0) {
                                 perror("send");
                             }
-                            lprintf("[thread: %ld] write to host_client failed\n", syscall(__NR_gettid));
-                        } else {
-//                            lprintf("[thread: %ld] sent %d bytes to %s @ sock_out: %d\n", syscall(__NR_gettid),
-//                                   err, inet_ntoa(req->sender.addr.sin_addr), req->sender.sock_out);
+                            printf("[thread: %ld] write to host_client failed\n", syscall(__NR_gettid));
                         }
                         free(message);
                         close(fd);
                         break;
                     }
                     case FCNT: // 2: this machine receiving a response with content
-                    /*
-                     * TODO
-                         * buflen shouldn't + 1 when concatting them, n machines would lead to n - 1
-                         bytes too many read when the filesystem has to deal with them
-                     */
-//                        printf("File content received\n");
                         req->buflen = char_count + 1; // char count includes 0 index so must add 1
                         req = realloc(req, sizeof(Request) + req->buflen);
                         if(!req){realloc_error();};
@@ -747,83 +705,3 @@ void *server_loop(void *arg) {
         } // END of poll loop
     } // END of inf for loop
 } // END of server loop
-
-//int main(int argc, char *argv[]) {
-//
-//    if(argc < 4) {
-//        printf("Not enough arguments given, 4 expected: total-machines port-number interface-name ipfile\n");
-//        exit(EXIT_FAILURE);
-//    }
-//    long nrm = strtol(argv[1], NULL, 10);
-//    long pnr = strtol(argv[2], NULL, 10);
-//    const char *infc = argv[3];
-//    const char *fn = argv[4];
-//    // Check if returned error from strtol OR if the longs are too large to convert
-//    if (errno != 0 || ((nrm > INT_MAX) || (pnr > INT_MAX ))) {
-//        printf("%s argument too large!\n", (nrm > INT_MAX) ? "first" : "second");
-//        exit(EXIT_FAILURE);
-//    }
-//    int err;
-//    nrmachines = (int)nrm - 1; // to account for this machine (not adding to connected clients)
-//    int portnr = (int)pnr;
-//
-//    printf("Connecting to other machines..\n");
-//    memset(&host_addr, 0, sizeof(host_addr));
-//    init_server(&host_addr, nrmachines, portnr, infc);
-//
-//    // init Address arrays and their corresponding mutex locks
-//    connected_clients = (Address *)malloc(sizeof(Address) * nrmachines);
-//    memset(connected_clients, 0, sizeof(Address) * nrmachines);
-//
-//    // accept all incoming connections until have sock_in for all machines in list
-//    struct accept_connection_args aca = {connected_clients, &connected_clients_lock,
-//                                         host_addr, nrmachines, fn};
-//    pthread_t aca_thread;
-//    pthread_create(&aca_thread, NULL, accept_connection, &aca);
-//    // connect to IPs in ipfile
-//    struct connect_to_file_IPs_args ctipa = {connected_clients, &connected_clients_lock,
-//                                             host_addr, nrmachines, fn};
-//    pthread_t ctipa_thread;
-//    pthread_create(&ctipa_thread, NULL, connect_to_file_IPs, &ctipa);
-//    // force main to wait until connected to all machines
-//    pthread_join(ctipa_thread, NULL);
-//    pthread_join(aca_thread, NULL);
-//
-//    printf("You are now connected to machines: \n");
-//    for(int j = 0; j < nrmachines; j++) {
-//        printf("%s\t@\t%d\n",
-//               inet_ntoa(connected_clients[j].addr.sin_addr),
-//               htons(connected_clients[j].addr.sin_port));
-//    }
-//    printf("on this address: \n%s\t@\t%d\n",
-//           inet_ntoa(host_addr.addr.sin_addr),
-//           htons(host_addr.addr.sin_port));
-//
-//    // start server loop to listen for connections
-//    struct server_loop_args sla = {connected_clients, &connected_clients_lock,
-//                                   host_addr, nrmachines, fn};
-//    pthread_t sla_thread;
-//    pthread_create(&sla_thread, NULL, server_loop, &sla);
-//
-//    char buf[1024];
-//    Address ad;
-//    for(;;) {
-//        printf("~ ");
-//        scanf("%s", buf);
-//        pthread_mutex_lock(&inprog_tracker_lock);
-//        // create Inprog and lock
-//        Inprog *inprog = inprog_create("/proc/net/dev");
-//        pthread_mutex_t *inprog_lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
-//        pthread_mutex_init(inprog_lock, NULL);
-//        // create node in linked list
-//        inprog_tracker_ll_add(&inprog_tracker_head, inprog, inprog_lock);
-//        pthread_mutex_unlock(&inprog_tracker_lock);
-//        // wait until complete
-//        while(!inprog->complete) {sleep(1);};
-//        pthread_mutex_lock(&inprog_tracker_lock);
-//        // delete inprog from list
-//        inprog_tracker_ll_remove(&inprog_tracker_head, *inprog);
-//        pthread_mutex_unlock(&inprog_tracker_lock);
-//    } // END of inf for loop
-//    return 0;
-//}
