@@ -10,6 +10,7 @@
 #endif
 
 #include <fuse.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -31,7 +32,7 @@
 #include <sys/xattr.h>
 #endif
 
-#include "writer.h"
+//#include "writer.h"
 #include "ds_new.h"
 #include "server_new.h"
 #include "pathnames.h"
@@ -75,7 +76,7 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
                     if (fd == -1) {
                         perror("openat");
                         printf("%s\n", pathbuf);
-                        exit (EXIT_FAILURE);
+                        exit(EXIT_FAILURE);
                     }
                     size = procsizefd(fd); // individually count chars in proc file - bottleneck for large fs
                     char *procbuf = malloc(sizeof(char) * size);
