@@ -12,7 +12,7 @@ make -j # for multithreaded make
 ./procdfs [-f -s] -d <mountdir> <total-machines> <port-number> <interface-name> <ipfile> <machine-ip>
 ```
 ### Input parameters
-1. ```-d``` : Debug flag, distributed version doesn't exist without it   
+1. ```-d``` : Debug flag, distributed version doesn't work without it   
 2. ```<mountdir>``` : This is the location where procdfs will mount, after running all files can be found inside this location   
 3. ```<total-machines>``` : The total number of machines on the network   
 4. ```<port-number>``` : The port number you wish to use for this particular machine   
