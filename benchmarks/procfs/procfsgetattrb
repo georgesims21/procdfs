@@ -1,6 +1,0 @@
-/proc/net/rt6_stats took 0.000005
-/proc/net/raw6 took 0.000004
-/proc/net/igmp took 0.000005
-/proc/net/dev took 0.000004
-/proc/net/netstat took 0.000005
-/proc/net/ipv6_route took 0.000005

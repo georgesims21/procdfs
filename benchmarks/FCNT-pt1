@@ -1,7 +1,0 @@
-(2 machines)
-FCNT extraction and allocation on rt6_stats took 0.000001 seconds (0.000001 - 0.000000)
-FCNT extraction and allocation on raw6 took 0.000005 seconds (0.000005 - 0.000000)
-FCNT extraction and allocation on igmp took 0.000008 seconds (0.000008 - 0.000000)
-FCNT extraction and allocation on dev took 0.000023 seconds (0.000023 - 0.000000)
-FCNT extraction and allocation on udp6 N/A
-FCNT extraction and allocation on ipv6_route took 0.000217 seconds (0.000217 - 0.000000)

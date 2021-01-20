@@ -1,5 +1,0 @@
-N = 15k
-without flag
-init_server() took 0.000004 seconds to execute 
-with flag
-init_server() took 0.000005 seconds to execute 
