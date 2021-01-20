@@ -46,6 +46,15 @@ pthread_mutex_t connected_clients_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t inprog_tracker_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t a_counter_lock = PTHREAD_MUTEX_INITIALIZER;
 
+void final_path(const char *path, char *buf) {
+
+    size_t len = strlen("/proc") + strlen(path) + 1;
+    char *tmp = malloc(sizeof(char) * len);
+    snprintf(tmp, len, "%s%s", "/proc", path);
+    memcpy(buf, tmp, len);
+    free(tmp);
+}
+
 static int procsys_getattr(const char *path, struct stat *stbuf,
                        struct fuse_file_info *fi) {
 
@@ -72,6 +81,11 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
             if(strcmp(path, paths[i]) == 0) {
                 if(nrmachines == 0) {
                     int fd = -1, res = 0, offset = 0, size = 0, err = 0;
+//                    if(fi->fh < 0) {
+//                        fd = openat(-100, pathbuf, O_RDONLY);
+//                    } else {
+//                        fd = fi->fh;
+//                    }
                     fd = openat(-100, pathbuf, O_RDONLY);
                     if (fd == -1) {
                         perror("openat");
@@ -219,7 +233,7 @@ static int procsys_open(const char *path, struct fuse_file_info *fi) {
     (void)path;
     (void)fi;
 //    int res;
-//    char fpath[MAX_PATH] = {0};
+//    char fpath[MAXPATH] = {0};
 //    final_path(path, fpath);
 //    res = openat(AT_FDCWD, fpath, O_RDONLY);
 //    if (res == -1)

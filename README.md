@@ -11,6 +11,7 @@ make -j # for multithreaded make
 # Use -f flag for running in foreground, -s single threaded. Must use debugging (-d) flag
 ./procdfs [-f -s] -d <mountdir> <total-machines> <port-number> <interface-name> <ipfile> <machine-ip>
 ```
+On every machine that you wish to monitor.
 ### Input parameters
 1. ```-d```               : Debug flag, distributed version doesn't work without it. The other two are optional   
 2. ```<mountdir>```       : This is the location where procdfs will mount, after running all files can be found inside this location   
