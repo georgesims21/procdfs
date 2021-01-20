@@ -30,15 +30,6 @@ void calloc_error(void) {
     exit(EXIT_FAILURE);
 }
 
-void final_path(const char *path, char *buf) {
-
-    size_t len = strlen("/proc") + strlen(path) + 1;
-    char *tmp = malloc(sizeof(char) * len);
-    snprintf(tmp, len, "%s%s", "/proc", path);
-    memcpy(buf, tmp, len);
-    free(tmp);
-}
-
 static int fetch_IP(Address *addr, const char *interface) {
 
     struct ifaddrs *ifaddr, *ifa;
@@ -530,7 +521,7 @@ Inprog *inprog_create(const char *path) {
         pthread_mutex_lock(inprog->inprog_lock);
         add_inprog(inprog, req); // adding single request to internal inprog linked list
         pthread_mutex_unlock(inprog->inprog_lock);
-        req_tracker_ll_print(&inprog->req_ll_head);
+//        req_tracker_ll_print(&inprog->req_ll_head);
         create_send_msg(req, FREQ);
     } // END of write for loop
     return inprog;
@@ -655,7 +646,7 @@ void *server_loop(void *arg) {
                         struct inprog_tracker_node *node = inprog_tracker_ll_fetch_req(&inprog_tracker_head, *req);
                         // add file buf received from other machine to the request (also checks if Inprog == complete)
                         inprog_add_buf(req, node->inprog, node->inprog->inprog_lock);
-                        inprog_tracker_ll_print(&inprog_tracker_head);
+//                        inprog_tracker_ll_print(&inprog_tracker_head);
                         pthread_mutex_unlock(&inprog_tracker_lock);
                         break;
                     default:
