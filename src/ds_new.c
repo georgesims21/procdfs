@@ -248,8 +248,6 @@ int inprog_add_buf(Request *req, Inprog *inprog, pthread_mutex_t *inprog_lock) {
         memset(rtn->req->buf, 0, req->buflen);
         strcpy(rtn->req->buf, req->buf);
         rtn->req->complete = true;
-        req_tracker_ll_print(&inprog->req_ll_head);
-
         // check if all requests (inc. this one) have been received
         pthread_mutex_lock(inprog->complete_lock);
         if(request_ll_complete(&inprog->req_ll_head) == inprog->messages_sent) {
