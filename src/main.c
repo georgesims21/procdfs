@@ -81,11 +81,6 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
             if(strcmp(path, paths[i]) == 0) {
                 if(nrmachines == 0) {
                     int fd = -1, res = 0, offset = 0, size = 0, err = 0;
-//                    if(fi->fh < 0) {
-//                        fd = openat(-100, pathbuf, O_RDONLY);
-//                    } else {
-//                        fd = fi->fh;
-//                    }
                     fd = openat(-100, pathbuf, O_RDONLY);
                     if (fd == -1) {
                         perror("openat");

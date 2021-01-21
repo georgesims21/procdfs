@@ -77,6 +77,7 @@ Request_tracker_node *req_tracker_ll_fetch(Request_tracker_node **head, Request 
 }
 
 void req_tracker_ll_print(Request_tracker_node **head) {
+    return;
 
     int count = 0;
     Request_tracker_node *listptr = *head;
@@ -299,6 +300,7 @@ int inprog_tracker_ll_add(Inprog_tracker_node **head, Inprog *inprog) {
 }
 
 void inprog_tracker_ll_print(Inprog_tracker_node **head) {
+    return;
 
     if(head == NULL) {
         printf("List empty!\n");
@@ -333,7 +335,6 @@ Inprog_tracker_node *inprog_tracker_ll_fetch_req(Inprog_tracker_node **head, Req
         exit(EXIT_FAILURE);
     }
     while(listptr != NULL) {
-        printf("checking atomic counter (inprog->ac): %llu\n", listptr->inprog->atomic_counter);
         if(listptr->inprog->atomic_counter == req.atomic_counter) {
             return listptr;
         }
