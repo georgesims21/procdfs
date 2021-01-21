@@ -16,6 +16,7 @@
 
 #include "server_new.h"
 #include "ds_new.h"
+#include "request_tracker_ll.h"
 
 void malloc_error(void) {
     perror("malloc");

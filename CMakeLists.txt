@@ -9,7 +9,7 @@ add_executable(procdfs
         src/main.c
         src/server_new.c src/server_new.h
         src/ds_new.h src/ds_new.c
-        src/pathnames.h)
+        src/pathnames.h src/request_tracker_ll.c src/request_tracker_ll.h)
 
 target_compile_definitions(${PROJECT_NAME} PUBLIC USE_FUSE FUSE_USE_VERSION=35)
 #include_directories(SYSTEM ${MPI_INCLUDE_PATH})
