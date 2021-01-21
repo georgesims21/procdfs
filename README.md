@@ -19,6 +19,7 @@ On every machine that you wish to monitor.
 4. ```<port-number>```    : The port number you wish to use for this particular machine   
 5. ```<interface-name>``` : Specify the interface name this machine should use (unused)   
 6. ```<ipfile>```         : A file containing all the IPs of the machines on the network. An example file can be found [here](example-ip-file.txt)   
+7. ```<machine-ip>```     : The IP address (IPv4) of the machine
 
 ### Querying a file
 Once running, you should be able to query a file in ```<mountdir>``` and get a concatenated version of that corresponding procfs file. For example if there are 3 machines which are connected:
