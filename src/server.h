@@ -4,7 +4,7 @@
 #include <glob.h>
 #include <netinet/in.h>
 
-#include "ds_new.h"
+#include "inprog.h"
 
 /*
  * Flags used in the message headers.

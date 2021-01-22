@@ -7,9 +7,9 @@
 #include <sys/types.h>
 #include <fcntl.h>
 
-#include "ds_new.h"
-#include "request_tracker_ll.h"
-#include "server_new.h"
+#include "inprog.h"
+#include "request.h"
+#include "server.h"
 
 //int req_tracker_ll_add(Request_tracker_node **head, Request *req) {
 //

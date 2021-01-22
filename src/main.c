@@ -32,10 +32,9 @@
 #include <sys/xattr.h>
 #endif
 
-//#include "writer.h"
-#include "ds_new.h"
-#include "request_tracker_ll.h"
-#include "server_new.h"
+#include "inprog.h"
+#include "request.h"
+#include "server.h"
 #include "pathnames.h"
 
 int nrmachines;
