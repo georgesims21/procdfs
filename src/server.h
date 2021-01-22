@@ -218,7 +218,4 @@ Inprog *file_request(const char *path);
  */
 int procsizefd(int fd);
 
-
-void final_path(const char *path, char *buf);
-
 #endif //PROCSYS_SERVER_NEW_H

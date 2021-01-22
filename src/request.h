@@ -1,8 +1,6 @@
 #ifndef PROCDFS_REQUEST_H
 #define PROCDFS_REQUEST_H
 
-//#include "inprog.h"
-
 #define MAXPATH 64
 /*
  * Contains all information needed for sending/receiving/identifying a machine.
@@ -125,9 +123,34 @@ int request_ll_free(Request_tracker_node **head);
  */
 int request_ll_complete(Request_tracker_node **head);
 
-
+/*
+ * Count the length of the final file given the head of the Request_tracker_node linked list. Once the Inprog
+ * is complete, the file contents are located within their corresponding request structure. This method
+ * goes through each of these and accumalates the total size of the buffers added together. It then counts it's
+ * own machine's matching procfs file and adds that to the total. The return value is the final size of the
+ * file which will be given back to the calling process.
+ *
+ * @param head head of the linked list
+ * @return total size of the buflens of each file in the request linked list put together
+ */
 int request_ll_countbuflen(Request_tracker_node **head);
+
+/*
+ * Collect all file buffers from within a single linked list and concatenate them together along with the current
+ * host machine's corresponding procfs file, and return that final buffer.
+ *
+ * @param head head of the linked list
+ * @return the final file buf of all machine's files concatenated together
+ */
 char *request_ll_catbuf(Request_tracker_node **head);
+
+/*
+ * Compare two requests to see if they are equal.
+ *
+ * @param req1 the first request to be compared
+ * @param req2 the second request to be compared
+ * @return 0 if equal, 1 if they are not
+ */
 static int request_cmp(Request req1, Request req2);
 
 #endif //PROCDFS_REQUEST_H

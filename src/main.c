@@ -46,7 +46,7 @@ pthread_mutex_t connected_clients_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t inprog_tracker_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t a_counter_lock = PTHREAD_MUTEX_INITIALIZER;
 
-void final_path(const char *path, char *buf) {
+static void final_path(const char *path, char *buf) {
 
     size_t len = strlen("/proc") + strlen(path) + 1;
     char *tmp = malloc(sizeof(char) * len);

@@ -7,7 +7,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-//#include "inprog.h"
 #include "request.h"
 #include "server.h"
 
