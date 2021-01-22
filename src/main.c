@@ -32,9 +32,9 @@
 #include <sys/xattr.h>
 #endif
 
-//#include "writer.h"
-#include "ds_new.h"
-#include "server_new.h"
+#include "inprog.h"
+#include "request.h"
+#include "server.h"
 #include "pathnames.h"
 
 int nrmachines;
@@ -46,7 +46,7 @@ pthread_mutex_t connected_clients_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t inprog_tracker_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t a_counter_lock = PTHREAD_MUTEX_INITIALIZER;
 
-void final_path(const char *path, char *buf) {
+static void final_path(const char *path, char *buf) {
 
     size_t len = strlen("/proc") + strlen(path) + 1;
     char *tmp = malloc(sizeof(char) * len);
@@ -81,11 +81,6 @@ static int procsys_getattr(const char *path, struct stat *stbuf,
             if(strcmp(path, paths[i]) == 0) {
                 if(nrmachines == 0) {
                     int fd = -1, res = 0, offset = 0, size = 0, err = 0;
-//                    if(fi->fh < 0) {
-//                        fd = openat(-100, pathbuf, O_RDONLY);
-//                    } else {
-//                        fd = fi->fh;
-//                    }
                     fd = openat(-100, pathbuf, O_RDONLY);
                     if (fd == -1) {
                         perror("openat");

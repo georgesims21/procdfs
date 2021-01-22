@@ -4,7 +4,7 @@
 #include <glob.h>
 #include <netinet/in.h>
 
-#include "ds_new.h"
+#include "inprog.h"
 
 /*
  * Flags used in the message headers.
@@ -217,8 +217,5 @@ Inprog *file_request(const char *path);
  * @return the size of the file, otherwise exit failiure
  */
 int procsizefd(int fd);
-
-
-void final_path(const char *path, char *buf);
 
 #endif //PROCSYS_SERVER_NEW_H

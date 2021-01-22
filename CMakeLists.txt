@@ -7,9 +7,9 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/CMakeModules/")
 add_executable(procdfs
         src/main.c
-        src/server_new.c src/server_new.h
-        src/ds_new.h src/ds_new.c
-        src/pathnames.h)
+        src/server.c src/server.h
+        src/inprog.h src/inprog.c
+        src/pathnames.h src/request.c src/request.h)
 
 target_compile_definitions(${PROJECT_NAME} PUBLIC USE_FUSE FUSE_USE_VERSION=35)
 #include_directories(SYSTEM ${MPI_INCLUDE_PATH})
