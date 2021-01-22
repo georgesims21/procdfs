@@ -479,10 +479,6 @@ int create_send_msg(Request *req, int flag) {
             printf("send error");
             exit(1);
         }
-        printf("[thread: %ld ] write to host_client failed\n", syscall(__NR_gettid));
-    } else {
-        printf("[thread: %ld ] sent %d bytes to %s @ sock_out: %d\n", syscall(__NR_gettid),
-               err, inet_ntoa(req->sender.addr.sin_addr), req->sender.sock_out);
     }
     free(message);
     return 0;
