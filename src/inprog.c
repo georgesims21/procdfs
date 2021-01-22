@@ -6,6 +6,7 @@
 
 #include "inprog.h"
 #include "request.h"
+#include "error.h"
 
 int inprog_add_buf(Request *req, Inprog *inprog, pthread_mutex_t *inprog_lock) {
 
@@ -15,6 +16,7 @@ int inprog_add_buf(Request *req, Inprog *inprog, pthread_mutex_t *inprog_lock) {
         // Realloc this rtn and copy buflen and buf into it, now it is complete
         rtn->req->buflen = req->buflen;
         rtn->req = realloc(rtn->req, sizeof(Request) + req->buflen);
+        if(!rtn->req) {realloc_error();};
         memset(rtn->req->buf, 0, req->buflen);
         strcpy(rtn->req->buf, req->buf);
         rtn->req->complete = true;
@@ -46,10 +48,7 @@ int inprog_tracker_ll_add(Inprog_tracker_node **head, Inprog *inprog) {
         return -1;
     Inprog_tracker_node *listptr = *head;
     Inprog_tracker_node *newnode = (Inprog_tracker_node *)malloc(sizeof(Inprog_tracker_node));
-    if(newnode == NULL) {
-        perror("malloc");
-        exit(EXIT_FAILURE);
-    }
+    if(!newnode) {malloc_error();};
     memset(newnode, 0, sizeof(Request_tracker_node));
     newnode->inprog = inprog;
     newnode->next = NULL;

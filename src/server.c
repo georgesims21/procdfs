@@ -17,19 +17,7 @@
 #include "server.h"
 #include "inprog.h"
 #include "request.h"
-
-void malloc_error(void) {
-    perror("malloc");
-    exit(EXIT_FAILURE);
-}
-void realloc_error(void) {
-    perror("realloc");
-    exit(EXIT_FAILURE);
-}
-void calloc_error(void) {
-    perror("calloc");
-    exit(EXIT_FAILURE);
-}
+#include "error.h"
 
 static int fetch_IP(Address *addr, const char *interface) {
 

@@ -36,6 +36,7 @@
 #include "request.h"
 #include "server.h"
 #include "pathnames.h"
+#include "error.h"
 
 int nrmachines;
 long long a_counter;
