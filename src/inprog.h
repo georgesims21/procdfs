@@ -6,66 +6,66 @@
 #include <stdbool.h>
 #include <pthread.h>
 
-#include "request_tracker_ll.h"
+#include "request.h"
 /*
  * Give a limit to the max length of a file path in procdfs.
  */
-#define MAXPATH 64
+//#define MAXPATH 64
 
-/*
- * Contains all information needed for sending/receiving/identifying a machine.
- */
-typedef struct address {
-    /*
-     * Socket for receiving
-     */
-    int sock_in;
-    /*
-     * Socket for sending
-     */
-    int sock_out;
-    /*
-     * Length of the addr struct
-     */
-    size_t addr_len;
-    /*
-     * Containing IP and port specific information
-     */
-    struct sockaddr_in addr;
-}Address;
+///*
+// * Contains all information needed for sending/receiving/identifying a machine.
+// */
+//typedef struct address {
+//    /*
+//     * Socket for receiving
+//     */
+//    int sock_in;
+//    /*
+//     * Socket for sending
+//     */
+//    int sock_out;
+//    /*
+//     * Length of the addr struct
+//     */
+//    size_t addr_len;
+//    /*
+//     * Containing IP and port specific information
+//     */
+//    struct sockaddr_in addr;
+//}Address;
 
-/*
- * Contains all information about a single request including sender address information and an atomic
- * counter to be able to group multiple requests together. Also this includes a flexible array member (buf)
- * to allow the struct to be realloc'ed when the file content is received, and thus dynamically adding file
- * content to the structure.
- */
-typedef struct request {
-    /*
-     * Address information about where this request is being sent to
-     */
-    Address sender;
-    /*
-     * Atomic counter to define and group requests
-     */
-    long long atomic_counter;
-    /*
-     * Allows request to be marked as complete when the file content is added (and this request is satisfied)
-     */
-    bool complete;
-    /*
-     * Path of the file linked to this request (and atomic counter)
-     */
-    char path[MAXPATH];
-    /*
-     * Length of the file content
-     */
-    unsigned long buflen;
-    /*
-     * File content (flexible array member)
-     */
-    char buf[];
-}Request;
+///*
+// * Contains all information about a single request including sender address information and an atomic
+// * counter to be able to group multiple requests together. Also this includes a flexible array member (buf)
+// * to allow the struct to be realloc'ed when the file content is received, and thus dynamically adding file
+// * content to the structure.
+// */
+//typedef struct request {
+//    /*
+//     * Address information about where this request is being sent to
+//     */
+//    Address sender;
+//    /*
+//     * Atomic counter to define and group requests
+//     */
+//    long long atomic_counter;
+//    /*
+//     * Allows request to be marked as complete when the file content is added (and this request is satisfied)
+//     */
+//    bool complete;
+//    /*
+//     * Path of the file linked to this request (and atomic counter)
+//     */
+//    char path[MAXPATH];
+//    /*
+//     * Length of the file content
+//     */
+//    unsigned long buflen;
+//    /*
+//     * File content (flexible array member)
+//     */
+//    char buf[];
+//}Request;
 
 ///*
 // * Allows for requests to be grouped together in a linked list.

@@ -14,9 +14,9 @@
 #include <sys/syscall.h>
 #include <fcntl.h>
 
-#include "server_new.h"
-#include "ds_new.h"
-#include "request_tracker_ll.h"
+#include "server.h"
+#include "inprog.h"
+#include "request.h"
 
 void malloc_error(void) {
     perror("malloc");
