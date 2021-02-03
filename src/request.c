@@ -9,6 +9,7 @@
 
 #include "request.h"
 #include "server.h"
+#include "error.h"
 
 static int request_cmp(Request req1, Request req2) {
 
@@ -26,10 +27,7 @@ int req_tracker_ll_add(Request_tracker_node **head, Request *req) {
         return -1;
     Request_tracker_node *listptr = *head;
     Request_tracker_node *newnode = (Request_tracker_node *)malloc(sizeof(Request_tracker_node));
-    if(newnode == NULL) {
-        perror("malloc");
-        exit(EXIT_FAILURE);
-    }
+    if(!newnode) {malloc_error();};
     memset(newnode, 0, sizeof(Request_tracker_node));
     newnode->req = req;
     newnode->next = NULL;
@@ -52,10 +50,7 @@ int req_add_content(Request_tracker_node **head, Request req, char *cnt, int cnt
     if(node == NULL)
         return -1;
     node->req = realloc(node->req, sizeof(Request) + (cntlen * sizeof(char)));
-    if(node->req == NULL) {
-        perror("realloc");
-        exit(EXIT_FAILURE);
-    }
+    if(!node->req) {realloc_error();};
     snprintf(node->req->buf, cntlen, "%s", cnt);
     node->req->buflen = cntlen;
     return 0;
@@ -201,6 +196,7 @@ char *request_ll_catbuf(Request_tracker_node **head) {
                 old_count = count;
                 count += reqptr->req->buflen;
                 filebuf = realloc(filebuf, count);
+                if(!filebuf) {realloc_error();};
                 memset(&filebuf[old_count], 0, reqptr->req->buflen);
                 strncat(filebuf, reqptr->req->buf, reqptr->req->buflen);
             } else {
@@ -229,6 +225,7 @@ char *request_ll_catbuf(Request_tracker_node **head) {
         exit(EXIT_FAILURE);
     }
     filebuf = realloc(filebuf, count);
+    if(!filebuf) {realloc_error();};
     memset(&filebuf[old_count], 0, size);
     strncat(filebuf, procbuf, size);
     free(procbuf);
